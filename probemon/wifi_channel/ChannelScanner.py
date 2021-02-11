@@ -6,7 +6,6 @@ import random
 import logging
 import subprocess
 from typing import Callable, Union
-from socket import socket, AF_PACKET, SOCK_RAW
 from scapy.error import Scapy_Exception
 from scapy.layers.dot11 import RadioTap
 from scapy.all import (
@@ -23,19 +22,9 @@ class ChannelScanner:
         self.__wait_time = wait_time
         self.__console = console
 
-    def _check_permission(self):
-        try:
-            socket(AF_PACKET, SOCK_RAW)
-            return True
-        except PermissionError:
-            logger.error("Missing permissions to run channel sniffer. Try running as root.")
-            return False
-
     def _start_sniffer(self) -> bool:
-        if self._check_permission():
-            self.__sniffer.start()
-            return True
-        return False
+        self.__sniffer.start()
+        return True
 
     def _stop_sniffer(self) -> bool:
         try:
@@ -48,11 +37,11 @@ class ChannelScanner:
     def _get_channels(self) -> list:
         if not self.__available_channels:
             logger.debug("Getting channels for local wifi adapter.")
-            CHANNEL_REGEX = re.compile(r"\*\s(?P<frequency>\d{4})\sMHz\s\[(?P<channel>\d\d?)\]")
+            CHANNEL_REGEX = re.compile(r"\*\s(?P<frequency>\d{4})\sMHz\s\[(?P<channel>\d{1,3})\]")
             proc = subprocess.run(['iw', 'list'], stdout=subprocess.PIPE, encoding='utf-8')
             for line in proc.stdout.splitlines():
                 m = CHANNEL_REGEX.search(line)
-                if m:
+                if m and '(disabled)' not in line:
                     self.__available_channels.append(int(m.group('channel')))
         return self.__available_channels
 

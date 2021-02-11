@@ -13,22 +13,22 @@ COUNT =
 MACLOOKUP_API_KEY = 
 
 [MQTT]
+HOST = localhost
+PORT = 1883
+USER = test
+PASSWORD = testpassword
+CA_CERTS = 
+CERTFILE = 
+KEYFILE = 
+TOPIC = probe_request
+DEBUG = 
+
+[SQL]
+DIALECT = sqlite
+SQLITE_PATH = /tmp/probes.db
 HOST = 
 PORT = 
 USER = 
 PASSWORD = 
-CA_CERTS = 
-CERTFILE = 
-KEYFILE = 
-TOPIC = 
-DEBUG = 
-
-[SQL]
-DIALECT = postgresql
-SQLITE_PATH = 
-HOST = lennyspi.local
-PORT = 5432
-USER = pi
-PASSWORD = 4526
-DATABASE = test_probes
+DATABASE = 
 DRIVER = 

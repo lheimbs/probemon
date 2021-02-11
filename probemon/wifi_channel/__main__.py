@@ -5,7 +5,8 @@
 
 import logging
 import argparse
-from ChannelScanner import ChannelScanner
+from .misc import check_interface
+from .ChannelScanner import ChannelScanner
 
 # logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('channel_scan')
@@ -41,6 +42,7 @@ def main():
     else:
         logging.basicConfig(level=logging.WARNING)
 
+    check_interface(args.interface)
     channel_scanner = ChannelScanner(args.interface, wait_time=args.time, console=args.console)
     if args.mode == 'scan':
         channel_scanner.channel_scanner()

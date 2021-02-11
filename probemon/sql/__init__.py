@@ -1,55 +1,78 @@
 import logging
+from typing import TypeVar
+
 import sqlalchemy
-from sqlalchemy.orm.session import Session
-from contextlib import contextmanager
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.pool import StaticPool
+# from contextlib import contextmanager
+
+from ..ProbeRequest import Base
 
 logger = logging.getLogger('sql')
+Session = TypeVar('Session')
+ProbeRequest = TypeVar('ProbeRequest')
 
 class Sql:
     """ Class representing the sql connection """
+    __enabled = False
 
-    def __init__(self, enabled=False):
+    def enable():
+        Sql.__enabled = True
+
+    def disable():
+        Sql.__enabled = False
+
+    def is_enabled():
+        return Sql.__enabled
+
+    def publish_probe(probe: ProbeRequest, Session_cls: Session) -> None:
+        if Sql.is_enabled() and Session_cls is not None:
+            probe_model = probe.model()
+            if probe_model:
+                session = Session_cls()
+                try:
+                    session.add(probe_model)
+                    session.commit()
+                except:         # noqa: E722
+                    logger.exception("Exception occured during sql operation!")
+                    session.rollback()
+                    raise
+                finally:
+                    session.close()
+
+    def __init__(self):
         self._engine = None
-        self.__enabled = enabled
-
-    # def enable(self):
-    #     self.__enabled = True
-
-    def is_enabled(self):
-        return self.__enabled
 
     def set_url(self, url):
         try:
-            self._engine = sqlalchemy.create_engine(url)
-            self.__enabled = True
+            if url == 'sqlite://':
+                self._engine = sqlalchemy.create_engine(
+                    url, connect_args={'check_same_thread': False},
+                    poolclass=StaticPool,
+                )
+            else:
+                self._engine = sqlalchemy.create_engine(url)
+            Sql.enable()
         except ModuleNotFoundError:
             logger.exception(
-                "Could not create sql connection because a neccessary python module is missing."
+                "Could not create sql connection because "
+                "a neccessary python module is missing."
             )
             self._engine = None
 
-    def register_engine(self, Session):
-        if self._engine is not None:
-            Session.configure(bind=self._engine)
-            self.__enabled = True
+    def register(self) -> Session:
+        Session_cls = None
+        if self._engine is not None and Sql.is_enabled():
+            logger.debug("Making sql metadata...")
+            print(Base, Base.metadata)
+            Base.metadata.create_all(self._engine)
+            logger.debug("Getting sql scoped session...")
+            Session_cls = scoped_session(sessionmaker(bind=self._engine))
         else:
-            logger.error(
-                "Can't configure Sql-Session because the engine is not configured. "
+            logger.warning(
+                "Can't configure Sql-Session because "
+                "the engine is not configured. "
                 "Disabling sql!"
             )
-            self.__enabled = False
-
-
-@contextmanager
-def session_scope():
-    """Provide a transactional scope around a series of operations."""
-    session = Session()
-    try:
-        yield session
-        session.commit()
-    except:         # noqa: E722
-        logger.exception("Exception occured during sql operation!")
-        session.rollback()
-        raise
-    finally:
-        session.close()
+            Sql.disable()
+        return Session_cls

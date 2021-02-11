@@ -1,101 +1,127 @@
 import logging
+import threading
+import time
+import queue
+from collections import ChainMap
+from typing import TypeVar
 
-import click
-from click_option_group import optgroup, MutuallyExclusiveOptionGroup
-from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.orm import sessionmaker
+from scapy.all import sniff
 
+from .sql import Sql
+from .mqtt import Mqtt
+from .config.cli_options import cli_options
 from .config import get_config
-from .wifi_channel import set_channel
+from .wifi_channel import set_wifi_channel
+from .wifi_channel.misc import check_interface
+from .ProbeRequest import ProbeRequest
 # from .config.cli import cli
 # from .config.config_file import parse_config
 
 logging.basicConfig(
     format='%(name)-20s: %(funcName)-20s: %(levelname)-8s : %(message)s',
-    level=logging.INFO,
+    level=logging.DEBUG,
 )
-logger = logging.getLogger()
-Session = sessionmaker()
+logger = logging.getLogger('main')
+Session = TypeVar('Session')
 
-@click.command()
-@click.argument('interface', default='mon0')
-@click.option('--config', '-c', type=click.Path(), help="Provide a config file.")
-@click.option('--lower', '-l', is_flag=True, help="Convert mac and venodor strings to lowercase.")
-@click.option('--debug/--no-debug', default=False, help='Debug flag')
-@optgroup.group(
-    'Channel configuration', cls=MutuallyExclusiveOptionGroup,
-    help=(
-        "Set the wifi adapters channel for collection."
-        "This can also be run directly by calling the module 'wifi_channel'."
-    )
-)
-@optgroup.option('--channel-set', type=int, help="Manually set wifi channel.")
-@optgroup.option('--channel-auto', is_flag=True, help="Automatically set wifi channel.")
-@optgroup.group(
-    'Mqtt configuration',
-    help=(
-        'Configuration for publishing recorded probes to a mqtt network. '
-        "For more details see https://pypi.org/project/paho-mqtt/."
-    )
-)
-@optgroup.option('--mqtt-host', help='Broker host name')
-@optgroup.option('--mqtt-port', type=int, default=1883, help='Broker port')
-@optgroup.option('--mqtt-user', help='Mqtt username')
-@optgroup.option('--mqtt-password', help='Password for mqtt user')
-@optgroup.option(
-    '--mqtt-ca-certs', type=click.Path(),
-    help='Certificate Authority certificate files - provides basic network encryption.'
-)
-@optgroup.option(
-    '--mqtt-certfile', type=click.Path(),
-    help=(
-        "PEM encoded client certificate used for authentification - "
-        "used as client information for TLS based authentication."
-    )
-)
-@optgroup.option(
-    '--mqtt-keyfile', type=click.Path(),
-    help=(
-        "PEM encoded private keys used for authentification - "
-        "used as client information for TLS based authentication."
-    )
-)
-@optgroup.group(
-    'SQL configuration',
-    help=(
-        'Configuration for publishing recorded probes to a sql database. '
-        "For more information visit https://docs.sqlalchemy.org/en/14/core/engines.html#database-urls."
-    )
-)
-@optgroup.option(
-    '--sql-dialect',
-    type=click.Choice(['postgresql', 'mysql', 'oracle', 'mssql', 'sqlite'], case_sensitive=False),
-    help='Sql host name',
-)
-@optgroup.option(
-    '--sql-sqlite-path',
-    type=click.Path(),
-    help='Sqlite database path. Only needed when sql-dialect is sqlite.'
-)
-@optgroup.option('--sql-host', help='Sql host name')
-@optgroup.option('--sql-port', type=int)
-@optgroup.option('--sql-user', help='Username to connect to the database with')
-@optgroup.option('--sql-password', help='Password for sql user')
-@optgroup.option('--sql-database', help='Sql database which probes are written to.')
-@optgroup.option('--sql-driver', help='Sql driver if non-standard driver is desired.')
-# @optgroup.group('JSON configuration',
-#                 help="Configuraiton for writing recorded probes to a json file.")
-# @optgroup.option(
-#     '--json-file',
-#     type=click.Path(writable=True),
-#     help='JSON file path. Can be either to a directory or a file.'
-# )
-# @optgroup.option('--json-max-filesize')
+
+@cli_options
 def main(interface: str, config: str, debug: bool, **params: dict):
-    mqtt, sql = get_config(interface, config, debug, **params)
-    sql.register_engine(Session)
+    logger.info(f"Using interface {interface}.")
 
-    if any([optn.startswith('channel_') for optn in params]):
-        set_channel(interface, params)
+    app, sql = get_config(config=config, debug=debug, **params)
+    check_interface(interface)
+    set_wifi_channel(interface, app)
+    Session_cls = sql.register()
+
+    collect_probes(interface, app, Session_cls)
+
+
+def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
+    probes_queue = queue.Queue()
+
+    def add_probe_to_queue(packet):
+        # if packet and packet.haslayer(Dot11ProbeReq):
+        probes_queue.put_nowait(packet)
+
+    def packet_worker():
+        with Mqtt() as mqtt_client:
+            while True:
+                # Get a probe request packet out of the queue and process it
+                probe_time = time.perf_counter()
+                packet = probes_queue.get()
+                try:
+                    probe = ProbeRequest.from_packet(
+                        packet, get_vendor=app_cfg['vendor'],
+                    )
+                    logger.info(str(probe))
+                    mqtt_client.publish_probe(probe)
+                    Sql.publish_probe(probe, Session_cls)
+                except BaseException:
+                    logger.debug(
+                        "Raw packet exception occured on: "
+                        f"{packet.original.hex()}"
+                    )
+                    logger.exception("Exception occured processing packet:")
+                finally:
+                    logger.debug(
+                        f"{threading.currentThread().getName()} "
+                        "processed probe request in "
+                        f"{time.perf_counter() - probe_time:.2f}s."
+                    )
+                    # Notify the queue that the probe has been processed.
+                    probes_queue.task_done()
+
+    logger.debug(
+        f"Spawning {app_cfg['worker_threads']} "
+        f"daemon thread{'s' if app_cfg['worker_threads'] > 1 else ''} "
+        "to process collected probes."
+    )
+    for _ in range(app_cfg['worker_threads']):
+        t = threading.Thread(target=packet_worker, daemon=True)
+        t.start()
+
+    logger.debug("Start collecting probe requests...")
+    s = time.perf_counter()
+    try:
+        sniff(
+            iface='mon0', count=app_cfg['count'],
+            filter='subtype probe-req', prn=add_probe_to_queue,
+        )
+    # except KeyboardInterrupt:
+    finally:
+        remaining_probes = probes_queue.qsize()
+        logger.debug(
+            f"Sniffed for {time.perf_counter() - s:.2f} seconds. "
+            f"Probes in queue: {remaining_probes}, active worker threads: "
+            f"{threading.active_count() - 1}."
+        )
+        s = time.perf_counter()
+        if remaining_probes > 0:
+            if threading.active_count() < 2:
+                logger.error(
+                    "Error occured processing probes. "
+                    f"Manually printing {remaining_probes} probes."
+                )
+                while not probes_queue.empty():
+                    packet = probes_queue.get()
+                    probe = ProbeRequest.from_packet(packet, get_vendor=False)
+                    logger.info(str(probe))
+                    probes_queue.task_done()
+            else:
+                logger.info(
+                    f"Please wait while aprox. {remaining_probes} remaining "
+                    "probes are getting processed..."
+                )
+        else:
+            logger.info("Final processing...")
+        logger.debug("Joining queue...")
+        probes_queue.join()
+        logger.debug(
+            f"Processing took {time.perf_counter() - s:.2f} seconds."
+            " Bye."
+        )
 
 
 if __name__ == "__main__":
