@@ -37,9 +37,13 @@ class Mqtt(object):
         if not port:
             logger.info("No port supplied. Using default port 1883.")
             port = 1883
-        elif port and isinstance(port, str) and port.isnumeric():
-            logger.debug("Converting port of type <str> to <int>.")
-            port = int(port)
+        elif port:
+            try:
+                port = int(port)
+            except ValueError:
+                logger.error("Invalid port supplied. Disabling Mqtt!")
+                Mqtt.disable()
+                return
 
         logger.debug(f"Setting mqtt host {host} with port {port}.")
         Mqtt.__host = host
@@ -57,8 +61,8 @@ class Mqtt(object):
     def set_user(user, password) -> None:
         if Mqtt.is_enabled():
             logger.debug(f"Setting mqtt user {user} with password {password}.")
-            Mqtt.__user = user
-            Mqtt.__password = password
+            Mqtt.__user = str(user)
+            Mqtt.__password = str(password)
 
     def set_tls(ca_certs: str, certfile: str, keyfile: str) -> None:
         if Mqtt.is_enabled() and (ca_certs or (certfile and keyfile)):
@@ -102,6 +106,9 @@ class Mqtt(object):
                 logger.error(
                     "Connection to mqtt broker refused. Disabling mqtt!"
                 )
+                Mqtt.disable()
+            except mqtt_client.ssl.SSLError as err:
+                logger.error(f"SSL error: {err}.")
                 Mqtt.disable()
         return self
 
