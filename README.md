@@ -7,39 +7,79 @@ I decided to build this simple python script using scapy so that I could record 
 ## Usage
 
 ```
-usage: probemon.py [-h] [-i INTERFACE] [-t TIME] [-o OUTPUT] [-b MAX_BYTES]
-                   [-c MAX_BACKUPS] [-d DELIMITER] [-f] [-s] [-r] [-D] [-l]
-                   [-x MQTT_BROKER] [-u MQTT_USER] [-p MQTT_PASSWORD]
-                   [-m MQTT_TOPIC] [-P FILENAME]
+Usage: __main__.py [OPTIONS] [INTERFACE]
 
-a command line tool for logging 802.11 probe request frames
+Options:
+  -c, --config PATH               Provide a config file.
+  -l, --lower                     Convert mac and venodor strings to
+                                  lowercase.
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INTERFACE, --interface INTERFACE
-                        capture interface
-  -t TIME, --time TIME  output time format (unix, iso)
-  -b MAX_BYTES, --max-bytes MAX_BYTES
-                        maximum log size in bytes before rotating
-  -c MAX_BACKUPS, --max-backups MAX_BACKUPS
-                        maximum number of log files to keep
-  -d DELIMITER, --delimiter DELIMITER
-                        output field delimiter
-  -f, --mac-info        include MAC address manufacturer
-  -s, --ssid            include probe SSID in output
-  -r, --rssi            include rssi in output
-  -D, --debug           enable debug output
-  -l, --log             enable scrolling live view of the logfile
-  -P FILENAME, --pid FILENAME
-                        save PID to file
-  -x MQTT_BROKER, --mqtt-broker MQTT_BROKER
-                        mqtt broker server
-  -u MQTT_USER, --mqtt-user MQTT_USER
-                        mqtt user
-  -p MQTT_PASSWORD, --mqtt-password MQTT_PASSWORD
-                        mqtt password
-  -m MQTT_TOPIC, --mqtt-topic MQTT_TOPIC
-                        mqtt topic
+  -r, --raw                       Include hex formatted raw probe request
+                                  packet.
+
+  -v, --vendor                    Try to get vendor correlating to caputred
+                                  mac address.
+
+  -t, --worker-threads INTEGER RANGE
+                                  Number of workers that parse the recorded
+                                  probe requests.
+
+  -c, --count INTEGER RANGE       Number probe requests to capture before
+                                  exiting. 0 for infinite probes. Default 0.
+
+  --debug / --no-debug            Debug flag
+  --no-stdout                     Disable printing probes to stdout. DOES NOT
+                                  DISABLE LOGGING!
+
+  Channel configuration: [mutually_exclusive]
+                                  Set the wifi adapters channel for
+                                  collection.This can also be run directly by
+                                  calling the module 'wifi_channel'.
+    --channel-set INTEGER         Manually set wifi channel.
+    --channel-auto                Automatically set wifi channel.
+
+  Mqtt configuration:             Configuration for publishing recorded probes
+                                  to a mqtt network. For more details see
+                                  https://pypi.org/project/paho-mqtt/.
+    --mqtt-host TEXT              Broker host name
+    --mqtt-port INTEGER           Broker port
+    --mqtt-topic TEXT             Topic to publish probes under.
+    --mqtt-user TEXT              Mqtt username
+    --mqtt-password TEXT          Password for mqtt user
+    --mqtt-ca-certs PATH          Certificate Authority certificate files -
+                                  provides basic network encryption.
+
+    --mqtt-certfile PATH          PEM encoded client certificate used for
+                                  authentification - used as client
+                                  information for TLS based authentication.
+
+    --mqtt-keyfile PATH           PEM encoded private keys used for
+                                  authentification - used as client
+                                  information for TLS based authentication.
+
+    --mqtt-debug                  Set mqtt client debugging individually.
+
+  SQL configuration:              Configuration for publishing recorded probes
+                                  to a sql database. For more information
+                                  visit https://docs.sqlalchemy.org/en/14/core
+                                  /engines.html#database-urls.
+    --sql-dialect [postgresql|mysql|oracle|mssql|sqlite]
+                                  Sql host name
+    --sql-sqlite-path PATH        Sqlite database path. Only needed when sql-
+                                  dialect is sqlite.
+
+    --sql-host TEXT               Sql host name
+    --sql-port INTEGER
+    --sql-user TEXT               Username to connect to the database with
+    --sql-password TEXT           Password for sql user
+    --sql-database TEXT           Sql database which probes are written to.
+    --sql-driver TEXT             Sql driver if non-standard driver is
+                                  desired.
+
+    --sql-kwargs TEXT             Sql additional url args that get appended
+                                  'as is' to url.
+
+  --help                          Show this message and exit.
 ```
 
 ## systemd Service-File Example
