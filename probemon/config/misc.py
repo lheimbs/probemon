@@ -14,7 +14,7 @@ def get_url(
     database: str,
     driver: str = "",
     sqlite_path: str = "",
-    **kwargs,  # kwargs are ignored but added to allow get_url(**params) call
+    **kwargs,
 ):
     url = "{dialect}://{user}@{host}/{dbname}"
     if dialect == "sqlite":
@@ -35,6 +35,9 @@ def get_url(
         if password:
             user = f"{url_quote_plus(str(user))}:{url_quote_plus(str(password))}"
         url = url.format(dialect=dialect, user=user, host=host, dbname=database)
+    if 'kwargs' in kwargs.keys() and kwargs['kwargs']:
+        logger.debug(f"Appending kwargs '{kwargs['kwargs']}' to database url.")
+        url = url + "?" + kwargs['kwargs']
     logger.debug(f"Sql url: '{url}'.")
     return url
 

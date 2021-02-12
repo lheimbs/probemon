@@ -104,9 +104,7 @@ def cli_options(main: FunctionType) -> FunctionType:
     main = sql_group.option('--sql-password', help='Password for sql user')(main)
     main = sql_group.option('--sql-database', help='Sql database which probes are written to.')(main)
     main = sql_group.option('--sql-driver', help='Sql driver if non-standard driver is desired.')(main)
-    main = sql_group.option(
-        '--sql-dump-packet', is_flag=True, help='Save packet dictionary to database. (Default: off)'
-    )(main)
+    main = sql_group.option('--sql-kwargs', help="Sql additional url args that get appended 'as is' to url.")(main)
 
     # file_group = OptionGroup('JSON configuration',
     #                 help="Configuraiton for writing recorded probes to a json file.")
