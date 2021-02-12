@@ -64,7 +64,6 @@ class Sql:
         Session_cls = None
         if self._engine is not None and Sql.is_enabled():
             logger.debug("Making sql metadata...")
-            print(Base, Base.metadata)
             Base.metadata.create_all(self._engine)
             logger.debug("Getting sql scoped session...")
             Session_cls = scoped_session(sessionmaker(bind=self._engine))
