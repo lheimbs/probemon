@@ -34,7 +34,9 @@ class Sql:
                     session.add(probe_model)
                     session.commit()
                 except:         # noqa: E722
-                    logger.exception("Exception occured during sql operation!")
+                    logger.exception(
+                        "Exception occured during sql operation!"
+                    )
                     session.rollback()
                     raise
                 finally:
