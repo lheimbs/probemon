@@ -3,3 +3,5 @@ venv
 *.log
 __pycache__/
 test*
+.env
+config.ini
