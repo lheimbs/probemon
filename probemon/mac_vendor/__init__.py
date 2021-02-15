@@ -6,13 +6,22 @@ import logging
 import netaddr
 import requests
 from maclookup import ApiClient
-from maclookup.exceptions.authorization_required_exception import AuthorizationRequiredException
-from maclookup.exceptions.not_enough_credits_exception import NotEnoughCreditsException
+from maclookup.exceptions.authorization_required_exception \
+    import AuthorizationRequiredException
+from maclookup.exceptions.not_enough_credits_exception \
+    import NotEnoughCreditsException
 
-logger = logging.getLogger('mac_vendor')
+logger = logging.getLogger(__name__)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
+logging.getLogger('maclookup-requester').setLevel(logging.WARNING)
+REQUEST_TIMEOUT = 2.0
 
-
-def get_mac_vendor(mac: str, maclookup_api_key: str = "", unknown_vendor: str = "", lower: bool = False):
+def get_mac_vendor(
+    mac: str,
+    maclookup_api_key: str = "",
+    unknown_vendor: str = "",
+    lower: bool = False,
+):
     if not mac:
         logger.debug("Empty mac! Skipping vendor search.")
         return unknown_vendor or os.environ.get('MAC_VENDOR_UNKNOWN', '')
@@ -61,7 +70,9 @@ def get_maclookup_vendor(mac: str, maclookup_api_key: str):
         except AuthorizationRequiredException:
             logger.warning("Given api key for maclookup is invalid.")
         except NotEnoughCreditsException:
-            logger.warning("Maclookups free 1000 daily requests limit reached.")
+            logger.warning(
+                "Maclookups free 1000 daily requests limit reached."
+            )
     else:
         logger.debug("No api key for maclookup supplied.")
     return vendor
@@ -73,8 +84,10 @@ def get_macvendorlookup_com_vendor(mac: str, *_):
     logger.debug(f"Trying macvendorlookup api ('{url}').")
 
     try:
-        result = requests.get(url, timeout=1.0)
-    except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
+        result = requests.get(url, timeout=REQUEST_TIMEOUT)
+    except (
+        requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
+    ):
         logger.warning(f"Request to {url} timed out.")
         return vendor
 
@@ -98,8 +111,10 @@ def get_macvendors_co_vendor(mac: str, *_):
     url = 'https://macvendors.co/api/{mac}'.format(mac=mac)
     logger.debug(f"Trying macvendors.co api ('{url}').")
     try:
-        result = requests.get(url, timeout=1.0)
-    except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
+        result = requests.get(url, timeout=REQUEST_TIMEOUT)
+    except (
+        requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
+    ):
         logger.warning(f"Request to {url} timed out.")
         return vendor
 
@@ -124,14 +139,17 @@ def get_macvendors_com_vendor(mac: str, *_):
     logger.debug(f"Trying macvendors.co api ('{url}').")
 
     try:
-        result = requests.get(url, timeout=1.0)
-    except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
+        result = requests.get(url, timeout=REQUEST_TIMEOUT)
+    except (
+        requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
+    ):
         logger.warning(f"Request to {url} timed out.")
         return vendor
 
     if result.status_code == 200:
         if '\n' not in result.text and len(result.text) < 100:
-            # bit paranoid that the api returns anything other than a simple vendor string
+            # bit paranoid that the api returns anything
+            # other than a simple vendor string
             vendor = result.text
     elif result.status_code == 429:
         logger.warning(f"Rate limit reached for '{url}'.")
