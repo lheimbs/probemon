@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from ..mac_vendor import get_mac_vendor
 
-logger = logging.getLogger('ProbeRequest')
+logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 class ProbeRequest:
@@ -73,7 +73,7 @@ class ProbeRequest:
         }
 
     @classmethod
-    def from_packet(cls, packet: RadioTap, get_vendor: bool):
+    def from_packet(cls, packet: RadioTap, get_vendor: bool, **kwargs: dict):
         time = datetime.fromtimestamp(packet.time)
         mac = packet.addr2
         ssid = packet.info.decode('utf8')
@@ -85,7 +85,8 @@ class ProbeRequest:
             ssid=ssid,
             rssi=rssi,
             raw=raw,
-            get_vendor=get_vendor
+            get_vendor=get_vendor,
+            **kwargs,
         )
 
     def model(self):
