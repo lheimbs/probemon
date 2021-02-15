@@ -1,11 +1,12 @@
 ; sections are case sensitive, keys are not
 [APP]
-DEBUG = True
 LOWER = 
 RAW = 
 VENDOR = 
-; CHANNEL options [unset]/AUTO
+; CHANNEL options [unset]/AUTO/HOP
 CHANNEL = 
+; if channel = hop: set hop duration (in seconds)
+CHANNEL_HOP_TIME = 1.5
 ; 1..N worker threads
 WORKER_THREADS = 
 ; 0..N probe request count
