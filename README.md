@@ -27,20 +27,18 @@ Options:
   -c, --count INTEGER RANGE       Number probe requests to capture before
                                   exiting. 0 for infinite probes. Default 0.
 
-  --debug / --no-debug            Debug flag
-  --no-stdout                     Disable printing probes to stdout. DOES NOT
-                                  DISABLE LOGGING!
+  --debug / --no-debug            Enable debugging output.
+  --verbose / --no-verbose        Enable verbose output: More status logs are
+                                  given but no debugging.
 
-  Channel configuration: [mutually_exclusive]
-                                  Set the wifi adapters channel for
-                                  collection.This can also be run directly by
-                                  calling the module 'wifi_channel'.
     --channel-set INTEGER         Manually set wifi channel.
     --channel-auto                Automatically set wifi channel.
+    --channel-hop FLOAT           Continously hop between channels.
+  Channel configuration: [mutually_exclusive]
+                                  Set the wifi adapters channel for
+                                  collection. This can also be run directly by
+                                  calling the module 'wifi_channel'.
 
-  Mqtt configuration:             Configuration for publishing recorded probes
-                                  to a mqtt network. For more details see
-                                  https://pypi.org/project/paho-mqtt/.
     --mqtt-host TEXT              Broker host name
     --mqtt-port INTEGER           Broker port
     --mqtt-topic TEXT             Topic to publish probes under.
@@ -58,11 +56,10 @@ Options:
                                   information for TLS based authentication.
 
     --mqtt-debug                  Set mqtt client debugging individually.
+  Mqtt configuration:             Configuration for publishing recorded probes
+                                  to a mqtt network. For more details see
+                                  https://pypi.org/project/paho-mqtt/.
 
-  SQL configuration:              Configuration for publishing recorded probes
-                                  to a sql database. For more information
-                                  visit https://docs.sqlalchemy.org/en/14/core
-                                  /engines.html#database-urls.
     --sql-dialect [postgresql|mysql|oracle|mssql|sqlite]
                                   Sql host name
     --sql-sqlite-path PATH        Sqlite database path. Only needed when sql-
@@ -78,6 +75,11 @@ Options:
 
     --sql-kwargs TEXT             Sql additional url args that get appended
                                   'as is' to url.
+
+  SQL configuration:              Configuration for publishing recorded probes
+                                  to a sql database. For more information
+                                  visit https://docs.sqlalchemy.org/en/14/core
+                                  /engines.html#database-urls.
 
   --help                          Show this message and exit.
 ```
