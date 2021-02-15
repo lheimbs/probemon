@@ -1,33 +1,39 @@
-import logging
-import threading
 import time
 import queue
-from collections import ChainMap
+import logging
+import threading
 from typing import TypeVar
+from collections import ChainMap
 
-# from sqlalchemy.orm import sessionmaker
 from scapy.all import sniff
 
 from .sql import Sql
 from .mqtt import Mqtt
-from .config.cli_options import cli_options
 from .config import get_config
+from .ProbeRequest import ProbeRequest
+from .config.cli_options import cli_options
 from .wifi_channel import set_wifi_channel
 from .wifi_channel.misc import check_interface
-from .ProbeRequest import ProbeRequest
-# from .config.cli import cli
-# from .config.config_file import parse_config
 
 logging.basicConfig(
-    format='%(name)-20s: %(funcName)-20s: %(levelname)-8s : %(message)s',
-    level=logging.DEBUG,
+    format=(
+        '[%(threadName)-10s] %(name)-20s: '
+        '%(funcName)-20s: %(levelname)-8s : %(message)s'
+    ),
 )
-logger = logging.getLogger('main')
+logger = logging.getLogger(__name__)
 Session = TypeVar('Session')
 
 
 @cli_options
-def main(interface: str, config: str, debug: bool, **params: dict):
+def main(
+    interface: str, config: str, debug: bool, verbose: bool, **params: dict
+):
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    elif verbose:
+        logging.getLogger().setLevel(logging.INFO)
+
     logger.info(f"Using interface {interface}.")
 
     app, sql = get_config(config=config, debug=debug, **params)
@@ -42,7 +48,6 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
     probes_queue = queue.Queue()
 
     def add_probe_to_queue(packet):
-        # if packet and packet.haslayer(Dot11ProbeReq):
         probes_queue.put_nowait(packet)
 
     def packet_worker():
@@ -54,6 +59,7 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
                 try:
                     probe = ProbeRequest.from_packet(
                         packet, get_vendor=app_cfg['vendor'],
+                        maclookup_api_key=app_cfg['maclookup_api_key']
                     )
                     logger.info(str(probe))
                     mqtt_client.publish_probe(probe)
@@ -82,12 +88,15 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
         t = threading.Thread(target=packet_worker, daemon=True)
         t.start()
 
-    logger.debug("Start collecting probe requests...")
+    logger.info("Start collecting probe requests...")
     s = time.perf_counter()
     try:
         sniff(
-            iface='mon0', count=app_cfg['count'],
-            filter='subtype probe-req', prn=add_probe_to_queue,
+            iface='mon0',
+            count=app_cfg['count'],
+            filter='subtype probe-req',
+            # filter='type mgt',
+            prn=add_probe_to_queue,
         )
     # except KeyboardInterrupt:
     finally:
