@@ -3,7 +3,7 @@ from typing import TypeVar
 
 import paho.mqtt.client as mqtt_client
 
-logger = logging.getLogger('mqtt')
+logger = logging.getLogger(__name__)
 ProbeRequest = TypeVar('ProbeRequest')
 
 class Mqtt(object):
@@ -27,7 +27,7 @@ class Mqtt(object):
 
     def set_server(host: str, port: int = 0) -> None:
         if not host:
-            logger.warning(
+            logger.info(
                 "Can't configure Mqtt-Client because no host is supplied. "
                 "Disabling mqtt!"
             )
@@ -35,13 +35,13 @@ class Mqtt(object):
             return
 
         if not port:
-            logger.info("No port supplied. Using default port 1883.")
+            logger.debug("No port supplied. Using default port 1883.")
             port = 1883
         elif port:
             try:
                 port = int(port)
             except ValueError:
-                logger.error("Invalid port supplied. Disabling Mqtt!")
+                logger.error("Invalid mqtt port supplied. Disabling Mqtt!")
                 Mqtt.disable()
                 return
 
@@ -49,6 +49,7 @@ class Mqtt(object):
         Mqtt.__host = host
         Mqtt.__port = port
         Mqtt.enable()
+        logger.info("Mqtt is ready to publish recorded probes...")
 
     def set_topic(topic: str) -> None:
         if Mqtt.is_enabled() and topic:
@@ -60,7 +61,9 @@ class Mqtt(object):
 
     def set_user(user, password) -> None:
         if Mqtt.is_enabled():
-            logger.debug(f"Setting mqtt user {user} with password {password}.")
+            logger.debug(
+                f"Setting mqtt user {user} with password {password}."
+            )
             Mqtt.__user = str(user)
             Mqtt.__password = str(password)
 

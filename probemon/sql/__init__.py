@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from ..ProbeRequest import Base
 
-logger = logging.getLogger('sql')
+logger = logging.getLogger(__name__)
 Session = TypeVar('Session')
 ProbeRequest = TypeVar('ProbeRequest')
 
@@ -69,8 +69,9 @@ class Sql:
             Base.metadata.create_all(self._engine)
             logger.debug("Getting sql scoped session...")
             Session_cls = scoped_session(sessionmaker(bind=self._engine))
+            logger.info("Sql is ready to save recorded probes...")
         else:
-            logger.warning(
+            logger.info(
                 "Can't configure Sql-Session because "
                 "the engine is not configured. "
                 "Disabling sql!"
