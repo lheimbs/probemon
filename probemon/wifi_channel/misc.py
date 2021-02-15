@@ -4,7 +4,7 @@ from socket import socket, AF_PACKET, SOCK_RAW
 
 import netifaces
 
-logger = logging.getLogger('wifi_channel.misc')
+logger = logging.getLogger(__name__)
 
 def check_interface(interface: str) -> None:
     """ Make sure the supplied interface exists and can be used.
@@ -22,5 +22,7 @@ def check_interface(interface: str) -> None:
         socket(AF_PACKET, SOCK_RAW)
         return True
     except PermissionError:
-        logger.error("Missing permissions to run channel sniffer. Try running as root.")
+        logger.error(
+            "Missing permissions to run channel sniffer. Try running as root."
+        )
         sys.exit("Root required for scapy to work.")
