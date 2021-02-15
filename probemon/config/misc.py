@@ -3,7 +3,7 @@ import logging
 from hashlib import sha3_256
 from urllib.parse import quote_plus as url_quote_plus
 
-logger = logging.getLogger('config.misc')
+logger = logging.getLogger(__name__)
 
 def get_url(
     dialect: str,
@@ -33,10 +33,16 @@ def get_url(
         if driver:
             dialect = f"{dialect}+{driver}"
         if password:
-            user = f"{url_quote_plus(str(user))}:{url_quote_plus(str(password))}"
-        url = url.format(dialect=dialect, user=user, host=host, dbname=database)
+            user = (
+                f"{url_quote_plus(str(user))}:{url_quote_plus(str(password))}"
+            )
+        url = url.format(
+            dialect=dialect, user=user, host=host, dbname=database,
+        )
     if 'kwargs' in kwargs.keys() and kwargs['kwargs']:
-        logger.debug(f"Appending kwargs '{kwargs['kwargs']}' to database url.")
+        logger.debug(
+            f"Appending kwargs '{kwargs['kwargs']}' to database url."
+        )
         url = url + "?" + kwargs['kwargs']
     logger.debug(f"Sql url: '{url}'.")
     return url
@@ -44,6 +50,7 @@ def get_url(
 
 class RedactingFilter(logging.Filter):
     def filter(self, record):
+        # print("filter: ", record)
         # print(record.msg)
         # print(self.redact(record.msg))
         record.msg = self.redact(record.msg)
@@ -55,25 +62,41 @@ class RedactingFilter(logging.Filter):
         return True
 
     def replace_pwd(self, match_object):
+        print("replace_pwd: ", match_object)
         # print(match_object.group("pwd"))
         if match_object.group("pwd"):
-            hashed_pwd = sha3_256(match_object.group("pwd").encode()).hexdigest()
-            return match_object[0].replace(match_object.group('pwd'), hashed_pwd)
+            hashed_pwd = sha3_256(
+                match_object.group("pwd").encode()
+            ).hexdigest()
+            return match_object[0].replace(
+                match_object.group('pwd'), hashed_pwd,
+            )
         return match_object[0]
 
     def redact(self, msg):
+        # print("redact: ", msg)
         msg = str(msg)
-        return re.sub(r'(?:(\w+):\/\/(.*?):)(?P<pwd>.*?)(?:\@(.*?):(.*?)\/(\w+))', self.replace_pwd, msg)
+        return re.sub(
+            r'(?:(\w+):\/\/(.*?):)(?P<pwd>.*?)(?:\@(.*?):(.*?)\/(\w+))',
+            self.replace_pwd,
+            msg,
+        )
 
 
 class RedactingFormatter(logging.Formatter):
-    URL_PASSWORD = re.compile(r'(?:(\w+):\/\/(.*?):)(?P<pwd>.*?)(?:\@(.*?):(.*?)\/(\w+))')
+    URL_PASSWORD = re.compile(
+        r'(?:(\w+):\/\/(.*?):)(?P<pwd>.*?)(?:\@(.*?):(.*?)\/(\w+))'
+    )
 
     def replace_pwd(self, match_object):
         # print(match_object.group("pwd"))
         if match_object.group("pwd"):
-            hashed_pwd = sha3_256(match_object.group("pwd").encode()).hexdigest()
-            return match_object[0].replace(match_object.group('pwd'), hashed_pwd)
+            hashed_pwd = sha3_256(
+                match_object.group("pwd").encode()
+            ).hexdigest()
+            return match_object[0].replace(
+                match_object.group('pwd'), hashed_pwd,
+            )
         return match_object[0]
 
     def format(self, msg):
@@ -81,5 +104,19 @@ class RedactingFormatter(logging.Formatter):
         redacted_message = super().format(record=msg)
 
         if password_match:
-            redacted_message = self.URL_PASSWORD.sub(self.replace_pwd, redacted_message)
+            print("redact: ", password_match)
+            redacted_message = self.URL_PASSWORD.sub(
+                self.replace_pwd, redacted_message
+            )
         return redacted_message
+
+
+class DebugFileHandler(logging.StreamHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def emit(self, record):
+        if not record.levelno == logging.DEBUG \
+                or not record.levelno == logging.INFO:
+            return
+        super().emit(record)

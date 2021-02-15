@@ -12,7 +12,7 @@ from ..mqtt import Mqtt
 from ..ProbeRequest import ProbeRequest
 # from ..probes import Session
 
-logger = logging.getLogger('config')
+logger = logging.getLogger(__name__)
 
 
 class IgnoreNoneChainMap(ChainMap):
@@ -87,7 +87,7 @@ def get_config_options(config: str, **params: dict) -> Union[ChainMap, ChainMap,
         logger.setLevel(logging.DEBUG)
         for handler in logger.handlers:
             handler.setLevel(logging.DEBUG)
-        logging.basicConfig(level=logging.DEBUG)
+        # logging.basicConfig(level=logging.DEBUG)
         logger.debug("Debugging enabled.")
 
     if not parsed_files:
