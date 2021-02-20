@@ -21,7 +21,7 @@ Options:
   -t, --worker-threads INTEGER RANGE
                                   Number of workers that parse the recorded
                                   probe requests.
-  -c, --count INTEGER RANGE       Number probe requests to capture before
+  -n, --count INTEGER RANGE       Number probe requests to capture before
                                   exiting. 0 for infinite probes. Default 0.
   --debug / --no-debug            Enable debugging output.
   --verbose / --no-verbose        Enable verbose output: More status logs are
