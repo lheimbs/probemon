@@ -41,6 +41,10 @@ def cli_options(main: FunctionType) -> FunctionType:
         ),
     )(main)
     main = click.option(
+        '--maclookup-api-key',
+        help="Maclookup API key to use with macaddress.io api."
+    )(main)
+    main = click.option(
         '--debug/--no-debug', default=False,
         help='Enable debugging output.',
     )(main)

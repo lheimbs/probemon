@@ -23,6 +23,8 @@ Options:
                                   probe requests.
   -n, --count INTEGER RANGE       Number probe requests to capture before
                                   exiting. 0 for infinite probes. Default 0.
+  --maclookup-api-key TEXT        Maclookup API key to use with macaddress.io
+                                  api.
   --debug / --no-debug            Enable debugging output.
   --verbose / --no-verbose        Enable verbose output: More status logs are
                                   given but no debugging.
