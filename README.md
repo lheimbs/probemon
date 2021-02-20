@@ -3,11 +3,13 @@ A (not that simple) command line tool for monitoring and logging 802.11 probe fr
 
 I decided to build upon klein0r's probemon script to add some more options and improve the mac vendor gathering.
 The mess this is now evolved from there.
-It kinda works - on my machine(s). 
+It kinda works - on my machine(s).
+Python 3.7+ 
 
 ## Usage
 
 ```
+>> python -m probemon --help
 Usage: __main__.py [OPTIONS] [INTERFACE]
 
 Options:
