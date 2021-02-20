@@ -32,7 +32,7 @@ def cli_options(main: FunctionType) -> FunctionType:
     )(main)
     main = click.option(
         '--count',
-        '-c',
+        '-n',
         type=click.IntRange(0, None),
         default=0,
         help=(

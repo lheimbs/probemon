@@ -93,7 +93,7 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
     try:
         sniff(
             iface='mon0',
-            count=app_cfg['count'],
+            count=app_cfg['count'] if app_cfg['count'] else 0,
             filter='subtype probe-req',
             # filter='type mgt',
             prn=add_probe_to_queue,
