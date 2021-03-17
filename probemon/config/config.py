@@ -3,10 +3,13 @@ import logging
 from collections import ChainMap
 from typing import Tuple
 
+import netaddr
+
 from .misc import get_url
 from .cli import get_cli_params
 from .dot_env import get_dotenv_params
 from .config_file import get_configfile_params
+from ..mac import Mac
 from ..sql import Sql
 from ..mqtt import Mqtt
 from ..probe_request import ProbeRequest
@@ -127,6 +130,18 @@ def get_config_options(config: str,
     return app, mqtt, sql
 
 
+def set_mac_dialect(dialect):
+    mac_dialect = f"mac_{dialect.lower()}"
+    if hasattr(netaddr, mac_dialect):
+        dialect = getattr(netaddr, mac_dialect)
+        Mac.dialect = dialect
+    else:
+        logger.warning(
+            f"Could not import MAC dialect {mac_dialect}. "
+            f"Using fallback {Mac.dialect}."
+        )
+
+
 def get_config(config: str, **params: dict) -> ChainMap:
     app_cfg, mqtt_cfg, sql_cfg = get_config_options(config, **params)
 
@@ -148,4 +163,7 @@ def get_config(config: str, **params: dict) -> ChainMap:
         ProbeRequest.get_vendor = True
     if app_cfg['maclookup_api_key']:
         ProbeRequest.maclookup_api_key = app_cfg['maclookup_api_key']
+    if app_cfg['vendor_offline']:
+        ProbeRequest.vendor_offline = True
+    set_mac_dialect(app_cfg['mac_format'])
     return app_cfg
