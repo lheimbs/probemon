@@ -5,13 +5,15 @@ import threading
 from typing import TypeVar
 from collections import ChainMap
 
+import click
 from scapy.all import sniff
 
 from .sql import Sql
 from .mqtt import Mqtt
 from .config import get_config
 from .probe_request import ProbeRequest
-from .config.cli_options import cli_options
+from .config.cli_options import cli_options, cli_channel_options, \
+    cli_mqtt_options, cli_sql_options
 from .wifi_channel import set_wifi_channel
 from .wifi_channel.misc import check_interface
 
@@ -24,8 +26,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 Session = TypeVar('Session')
 
-
+@click.command()
 @cli_options
+@cli_channel_options
+@cli_mqtt_options
+@cli_sql_options
 def main(
     interface: str, config: str, debug: bool, verbose: bool, **params: dict
 ):
