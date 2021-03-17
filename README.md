@@ -1,5 +1,5 @@
 # probemon
-A (not that simple) command line tool for monitoring and logging 802.11 probe frames
+A (not that simple) command line tool for monitoring and logging 802.11 probe frames.
 
 I decided to build upon klein0r's probemon script to add some more options and improve the mac vendor gathering.
 The mess this is now evolved from there.
@@ -9,8 +9,8 @@ Python 3.7+
 ## Usage
 
 ```
->> python -m probemon --help
-Usage: __main__.py [OPTIONS] [INTERFACE]
+>> python probemon.py --help
+Usage: probemon.py [OPTIONS] [INTERFACE]
 
 Options:
   -c, --config PATH               Provide a config file.
@@ -75,6 +75,8 @@ Options:
                                   desired.
     --sql-kwargs TEXT             Sql additional url args that get appended
                                   'as is' to url.
+    --sql-drop-all                Drop probe request table on startup. Only
+                                  valid in combination with DEBUG flag!
 
   --help                          Show this message and exit.
 ```
@@ -92,11 +94,12 @@ Type=simple
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/root/python
-# uncomment the next lines if your to skip interface setup
-ExecStartPre=-iw phy phy0 interface add mon0 type monitor
-ExecStartPre=-ip link set wlan0 down  # disable original wifi interface. needed for me to enable channel switching
-ExecStartPre=-ip link set mon0 up
+# uncomment the next lines to do some interface setups
+#ExecStartPre=-iw phy phy0 interface add mon0 type monitor
+#ExecStartPre=-ip link set wlan0 down  # disable original wifi interface. needed for me to enable channel switching
+#ExecStartPre=-ip link set mon0 up
 ExecStart=/root/python/probemon/probes.py mon0
+# give the script 30s to process queued probes. If its stil running after that, kill it
 ExecStop=sh -c '/bin/kill -s SIGINT -$MAINPID && timeout 30s tail --pid=$MAINPID -f /dev/null'
 StandardOutput=journal
 StandardError=journal
