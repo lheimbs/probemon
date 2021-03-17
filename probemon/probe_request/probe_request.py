@@ -17,6 +17,7 @@ class ProbeRequest:
     raw: bool = False
     lower: bool = False
     get_vendor: bool = False
+    vendor_offline: bool = False
     maclookup_api_key: str = ""
 
     def __init__(
@@ -56,6 +57,7 @@ class ProbeRequest:
                     self.mac.oui,
                     maclookup_api_key=ProbeRequest.maclookup_api_key,
                     lower=ProbeRequest.lower,
+                    offline=ProbeRequest.vendor_offline,
                 )
         self.vendor = vendor.lower() if ProbeRequest.lower else vendor
 
