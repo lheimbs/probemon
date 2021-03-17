@@ -1,17 +1,27 @@
 ; sections are case sensitive, keys are not
 [APP]
+; bool
 LOWER = 
+; bool
 RAW = 
+; bool
 VENDOR = 
-; CHANNEL options [unset]/AUTO/HOP
-CHANNEL = 
-; if channel = hop: set hop duration (in seconds)
-CHANNEL_HOP_TIME = 1.5
+; bool
+VENDOR_OFFLINE = 
+; bool
+CHANNEL_AUTO = 
+; int
+CHANNEL_SET = 
+; str
+CHANNEL_SSID_SELECT = 
 ; 1..N worker threads
 WORKER_THREADS = 
 ; 0..N probe request count
 COUNT = 
+; str
 MACLOOKUP_API_KEY = 
+; one out of: [bare, cisco, eui48, pgsql, unix, unix_expanded]
+MAC_FORMAT = 
 
 [MQTT]
 HOST = localhost
