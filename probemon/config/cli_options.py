@@ -175,6 +175,13 @@ def cli_options(main: FunctionType) -> FunctionType:
         '--sql-kwargs',
         help="Sql additional url args that get appended 'as is' to url.",
     )(main)
+    main = sql_group.option(
+        '--sql-drop-all', is_flag=True,
+        help=(
+            "Drop probe request table on startup. "
+            "Only valid in combination with DEBUG flag!"
+        ),
+    )(main)
 
     # file_group = OptionGroup(
     #     'JSON configuration',

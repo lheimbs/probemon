@@ -10,14 +10,14 @@ from scapy.all import sniff
 from .sql import Sql
 from .mqtt import Mqtt
 from .config import get_config
-from .ProbeRequest import ProbeRequest
+from .probe_request import ProbeRequest
 from .config.cli_options import cli_options
 from .wifi_channel import set_wifi_channel
 from .wifi_channel.misc import check_interface
 
 logging.basicConfig(
     format=(
-        '[%(threadName)-10s] %(name)-20s: '
+        '[%(threadName)-10s] %(name)-30s: '
         '%(funcName)-20s: %(levelname)-8s : %(message)s'
     ),
 )
@@ -36,15 +36,13 @@ def main(
 
     logger.info(f"Using interface {interface}.")
 
-    app, sql = get_config(config=config, debug=debug, **params)
+    app = get_config(config=config, debug=debug, **params)
     check_interface(interface)
     set_wifi_channel(interface, app)
-    Session_cls = sql.register()
 
-    collect_probes(interface, app, Session_cls)
+    collect_probes(interface, app)
 
-
-def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
+def collect_probes(interface: str, app_cfg: ChainMap):
     probes_queue = queue.Queue()
 
     def add_probe_to_queue(packet):
@@ -57,13 +55,10 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
                 probe_time = time.perf_counter()
                 packet = probes_queue.get()
                 try:
-                    probe = ProbeRequest.from_packet(
-                        packet, get_vendor=app_cfg['vendor'],
-                        maclookup_api_key=app_cfg['maclookup_api_key']
-                    )
-                    logger.info(str(probe))
+                    probe = ProbeRequest.from_packet(packet)
+                    logger.debug(probe)
                     mqtt_client.publish_probe(probe)
-                    Sql.publish_probe(probe, Session_cls)
+                    Sql.publish_probe(probe)
                 except BaseException:
                     logger.debug(
                         "Raw packet exception occured on: "
@@ -95,10 +90,8 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
             iface='mon0',
             count=app_cfg['count'] if app_cfg['count'] else 0,
             filter='subtype probe-req',
-            # filter='type mgt',
             prn=add_probe_to_queue,
         )
-    # except KeyboardInterrupt:
     finally:
         remaining_probes = probes_queue.qsize()
         logger.debug(
@@ -123,15 +116,9 @@ def collect_probes(interface: str, app_cfg: ChainMap, Session_cls: Session):
                     f"Please wait while aprox. {remaining_probes} remaining "
                     "probes are getting processed..."
                 )
-        else:
-            logger.info("Final processing...")
         logger.debug("Joining queue...")
         probes_queue.join()
         logger.debug(
             f"Processing took {time.perf_counter() - s:.2f} seconds."
             " Bye."
         )
-
-
-if __name__ == "__main__":
-    main()

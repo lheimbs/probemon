@@ -15,7 +15,7 @@ def get_url(
     driver: str = "",
     sqlite_path: str = "",
     **kwargs,
-):
+) -> str:
     url = "{dialect}://{user}@{host}/{dbname}"
     if dialect == "sqlite":
         url = "sqlite:///{}"
