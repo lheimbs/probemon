@@ -131,15 +131,16 @@ def get_config_options(config: str,
 
 
 def set_mac_dialect(dialect):
-    mac_dialect = f"mac_{dialect.lower()}"
-    if hasattr(netaddr, mac_dialect):
-        dialect = getattr(netaddr, mac_dialect)
-        Mac.dialect = dialect
-    else:
-        logger.warning(
-            f"Could not import MAC dialect {mac_dialect}. "
-            f"Using fallback {Mac.dialect}."
-        )
+    if dialect:
+        mac_dialect = f"mac_{dialect.lower()}"
+        if hasattr(netaddr, mac_dialect):
+            dialect = getattr(netaddr, mac_dialect)
+            Mac.dialect = dialect
+        else:
+            logger.warning(
+                f"Could not import MAC dialect {mac_dialect}. "
+                f"Using fallback {Mac.dialect}."
+            )
 
 
 def get_config(config: str, **params: dict) -> ChainMap:
