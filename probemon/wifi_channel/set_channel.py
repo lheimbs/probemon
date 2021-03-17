@@ -1,25 +1,38 @@
 import logging
+from typing import Tuple, TypeVar
 from .channel_scanner import ChannelScanner
 
 logger = logging.getLogger(__name__)
 
-def set_wifi_channel(interface: str, app_cfg: dict) -> None:
-    channel = app_cfg['channel'] if 'channel' in app_cfg.keys() else ""
-    if channel or app_cfg['channel_set'] \
-            or app_cfg['channel_auto'] or app_cfg['channel_hop']:
-        channel_scanner = ChannelScanner(interface)
-        if app_cfg['channel_set']:
-            channel_scanner.set_channel(app_cfg['channel_set'])
-        elif app_cfg['channel_auto'] or channel.lower() == 'auto':
-            channel_scanner.set_auto_channel()
-        elif app_cfg['channel_hop'] or channel.lower() == 'hop':
-            if app_cfg['channel_hop']:
-                hop_time = app_cfg['channel_hop']
-            elif 'channel_hop_time' in app_cfg.keys() and \
-                    app_cfg['channel_hop_time']:
-                hop_time = float(app_cfg['channel_hop_time'])
+
+def get_channel_setting(app_cfg: dict) -> Tuple[str, TypeVar]:
+    for setting, value in app_cfg.items():
+        if setting.startswith('channel'):
+            setting = setting.replace('channel_', '')
+            if isinstance(value, tuple):
+                if all([val is not None for val in value]):
+                    return setting, value
             else:
-                hop_time = 1
-            channel_scanner.channel_hopper_async_no_sniff_2GHz_most_common(
-                hop_time=hop_time
-            )
+                if value is not None:
+                    return setting, value
+    return '', None
+
+
+def set_wifi_channel(interface: str, app_cfg: dict) -> None:
+    setting, value = get_channel_setting(app_cfg)
+    logger.debug(f"Channel setting: '{setting}' with args: '{value}'.")
+
+    if not setting:
+        return
+
+    channel_scanner = ChannelScanner(interface)
+    if setting == 'auto':
+        channel_scanner.set_auto_channel()
+    elif setting == 'set':
+        channel_scanner.set_channel(value)
+    elif setting == 'hop':
+        channel_scanner.channel_hopper_async_no_sniff_2GHz_most_common(
+            hop_time=value[0], random=value[1]
+        )
+    elif setting == 'ssid_select':
+        channel_scanner.ssid_searcher(ssid=value)

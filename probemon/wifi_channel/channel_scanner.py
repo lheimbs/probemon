@@ -6,7 +6,7 @@ import random
 import logging
 import threading
 import subprocess
-from typing import Callable, Sequence, Union
+from typing import Callable, Sequence, Tuple
 from scapy.error import Scapy_Exception
 from scapy.layers.dot11 import RadioTap
 from scapy.all import (
@@ -157,6 +157,25 @@ class ChannelScanner:
             if 'channel' in ap.keys()
         ]
 
+    def _get_scanned_ssids(self) -> set:
+        return {
+            ap['ssid'] for ap in self.__access_points
+            if 'ssid' in ap.keys()
+        }
+
+    def _get_scanned_ssid_channels(self) -> dict:
+        ssid_dict = {}
+        for ap in self.__access_points:
+            if 'ssid' in ap.keys() and 'channel' in ap.keys():
+                if ap['ssid'] in ssid_dict.keys():
+                    if ap['channel'] in ssid_dict[ap['ssid']].keys():
+                        ssid_dict[ap['ssid']][ap['channel']] += 1
+                    else:
+                        ssid_dict[ap['ssid']][ap['channel']] = 1
+                else:
+                    ssid_dict.update({ap['ssid']: {ap['channel']: 1}})
+        return ssid_dict
+
     def _get_channel_count(self, skip_zero: bool = False) -> dict:
         scanned_channels = self._get_scanned_channels()
         counted_channels = {}
@@ -167,13 +186,21 @@ class ChannelScanner:
             counted_channels.update({channel: count})
         return counted_channels
 
-    def _get_max_used_channel(self) -> Union[int, int]:
+    def _get_max_used_channel(self) -> Tuple[int, int]:
+        """Count and rank occurence of each channel per AP in recived beacons.
+        returns: most used channel, number of times the channel is used
+        """
         counts = self._get_channel_count(skip_zero=True)
         if not counts:
             logger.warning("No channels detected!")
             return 0, 0
         max_channel = max(counts, key=counts.get)
         return max_channel, counts[max_channel]
+
+    def _get_max_scanned_channel(self, scanned: dict) -> Tuple[int, int]:
+        """Sort channels by their occurence ascending.
+        return: <channel number>, <number channel occurences>"""
+        return sorted(scanned.items(), key=lambda item: item[1])[-1]
 
     def print_channel_graph_vertical(self) -> None:
         for channel in self._get_channels():
@@ -272,13 +299,13 @@ class ChannelScanner:
         ).start()
 
     def channel_hopper_async_no_sniff_2GHz_most_common(
-        self, hop_time: float = 1.0,
+        self, hop_time: float = 1.0, random: bool = False
     ) -> None:
         channels_list = [1, 6, 12]
 
         logger.info("Starting channel hopper thread...")
         threading.Thread(
-            target=self._async_hopper(channels_list, hop_time, False),
+            target=self._async_hopper(channels_list, hop_time, random),
             daemon=True
         ).start()
 
@@ -286,3 +313,35 @@ class ChannelScanner:
         logger.info("Scanning for available channels...")
         max_used_channel = self.channel_scanner()
         return self.set_channel(max_used_channel)
+
+    def ssid_searcher(self, ssid: str, only_2ghz: bool = True) -> None:
+        start = time.perf_counter()
+        if only_2ghz:
+            max_chan = 15
+        else:
+            max_chan = 9999
+        channels_list = [
+            chan for chan in self._get_channels() if chan < max_chan
+        ]
+        self._start_sniffer()
+        while time.perf_counter() - start < 30:
+            # 30s max for scanning
+            for channel in channels_list:
+                self.set_channel(channel)
+                time.sleep(self.__wait_time)
+            if ssid in self._get_scanned_ssids():
+                break
+        scanned = self._get_scanned_ssid_channels()
+        if ssid in scanned:
+            channel, n_channel = self._get_max_scanned_channel(scanned[ssid])
+            logger.info(
+                f"Channel {channel} found {n_channel}x for SSID {ssid}."
+            )
+            pass
+        else:
+            channel, n_channel = self._get_max_used_channel()
+            logger.info(
+                f"SSID {ssid} not found. "
+                f"Setting most used channel: {channel} (used {n_channel}x)."
+            )
+        self.set_channel(channel)
