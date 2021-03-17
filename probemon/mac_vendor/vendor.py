@@ -21,18 +21,20 @@ def get_mac_vendor(
     maclookup_api_key: str = "",
     unknown_vendor: str = "",
     lower: bool = False,
+    offline: bool = False,
 ):
     if not mac:
         logger.debug("Empty mac! Skipping vendor search.")
         return unknown_vendor or os.environ.get('MAC_VENDOR_UNKNOWN', '')
 
-    vendor_funcs = [
-        get_netaddr_vendor,
-        get_maclookup_vendor,
-        get_macvendors_co_vendor,
-        get_macvendorlookup_com_vendor,
-        get_macvendors_com_vendor
-    ]
+    vendor_funcs = [get_netaddr_vendor]
+    if not offline:
+        vendor_funcs += [
+            get_maclookup_vendor,
+            get_macvendors_co_vendor,
+            get_macvendorlookup_com_vendor,
+            get_macvendors_com_vendor
+        ]
 
     for vendor_func in vendor_funcs:
         vendor = vendor_func(mac, maclookup_api_key)
