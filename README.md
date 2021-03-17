@@ -185,12 +185,12 @@ After=network.target
 Type=simple
 Restart=on-failure
 RestartSec=5s
-WorkingDirectory=/root/python
+WorkingDirectory=/root/probemon
 # uncomment the next lines to do some interface setups
 #ExecStartPre=-iw phy phy0 interface add mon0 type monitor
 #ExecStartPre=-ip link set wlan0 down  # disable original wifi interface. needed for me to enable channel switching
 #ExecStartPre=-ip link set mon0 up
-ExecStart=/root/python/probemon/probes.py mon0
+ExecStart=/root/probemon/venv/bin/python3 probemon.py mon0 --lower --raw --vendor --worker-threads 2 --channel-auto
 # give the script 30s to process queued probes. If its stil running after that, kill it
 ExecStop=sh -c '/bin/kill -s SIGINT -$MAINPID && timeout 30s tail --pid=$MAINPID -f /dev/null'
 StandardOutput=journal
