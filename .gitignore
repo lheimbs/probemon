@@ -2,7 +2,9 @@
 venv
 *.log
 __pycache__/
-test*
+test/*
+testvenv/
+*test.py
 .env
 config.ini
 *.db
