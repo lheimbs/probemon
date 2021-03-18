@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from typing import Union
 
 from scapy.layers.dot11 import RadioTap
 from sqlalchemy import Column, Integer, String, DateTime, Sequence
@@ -23,7 +24,7 @@ class ProbeRequest:
     def __init__(
         self,
         time: datetime = None,
-        mac: str = "",
+        mac: Union[str, Mac] = None,
         ssid: str = "",
         rssi: int = 0,
         raw: str = "",
@@ -37,16 +38,16 @@ class ProbeRequest:
                 "Mac address has to be either of type "
                 f"<str> or type {Mac.__mro__[0]}!"
             )
-        self.time = time
+        self.time = time if time else datetime.now()
         self.ssid = ssid if not ProbeRequest.lower else ssid.lower()
         self.rssi = rssi
         self.raw = raw if ProbeRequest.raw else ""
-        self._set_vendor()
+        self.vendor = self._set_vendor()
 
-    def _set_vendor(self):
-        from ..sql import Sql
+    def _set_vendor(self) -> str:
         vendor = ''
         if ProbeRequest.get_vendor:
+            from ..sql import Sql
             vendor = Sql.get_vendor(self.mac)
             if vendor:
                 logger.debug(
@@ -59,18 +60,18 @@ class ProbeRequest:
                     lower=ProbeRequest.lower,
                     offline=ProbeRequest.vendor_offline,
                 )
-        self.vendor = vendor.lower() if ProbeRequest.lower else vendor
+        return vendor.lower() if ProbeRequest.lower else vendor
 
     @classmethod
     def from_packet(cls, packet: RadioTap, **kwargs: dict):
         if hasattr(packet, 'time'):
-            time = datetime.fromtimestamp(packet.time)
+            time: datetime = datetime.fromtimestamp(packet.time)
         else:
-            time = datetime.now()
-        mac = packet.addr2
-        ssid = packet.info.decode('utf8')
-        rssi = packet.dBm_AntSignal
-        raw = packet.original.hex()
+            time: datetime = datetime.now()
+        mac: str = packet.addr2
+        ssid: str = packet.info.decode('utf8')
+        rssi: int = packet.dBm_AntSignal
+        raw: str = packet.original.hex()
         return cls(
             time=time,
             mac=mac,
@@ -129,7 +130,7 @@ class ProbeRequest:
         }
 
 
-class ProbeRequestModel(Base, ProbeRequest):
+class ProbeRequestModel(Base):
     __tablename__ = "probe_requests"
 
     id = Column(Integer, Sequence('probe_request_id_seq'), primary_key=True)
@@ -139,3 +140,10 @@ class ProbeRequestModel(Base, ProbeRequest):
     ssid = Column(String(200))
     rssi = Column(Integer)
     raw = Column(String(1000))
+
+    def __str__(self):
+        return (
+            f"<ProbeRequestModel(id={self.id}, "
+            f"time={self.time}, "
+            f"mac={self.mac}>"
+        )
