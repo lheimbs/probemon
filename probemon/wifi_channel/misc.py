@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 def check_interface(interface: str) -> None:
     """ Make sure the supplied interface exists and can be used.
-        Exit if not.
+
+    Exit if not.
     """
     available_interfaces = netifaces.interfaces()
     if interface not in available_interfaces:

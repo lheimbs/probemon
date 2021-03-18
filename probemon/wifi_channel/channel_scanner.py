@@ -188,6 +188,7 @@ class ChannelScanner:
 
     def _get_max_used_channel(self) -> Tuple[int, int]:
         """Count and rank occurence of each channel per AP in recived beacons.
+
         returns: most used channel, number of times the channel is used
         """
         counts = self._get_channel_count(skip_zero=True)
@@ -199,7 +200,9 @@ class ChannelScanner:
 
     def _get_max_scanned_channel(self, scanned: dict) -> Tuple[int, int]:
         """Sort channels by their occurence ascending.
-        return: <channel number>, <number channel occurences>"""
+
+        return: <channel number>, <number channel occurences>
+        """
         return sorted(scanned.items(), key=lambda item: item[1])[-1]
 
     def print_channel_graph_vertical(self) -> None:

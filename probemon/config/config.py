@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 class IgnoreNoneChainMap(ChainMap):
     """A ChainMap that ignores None entries in the map.
-    It allows defining defaults in cli options.
 
+    It allows defining defaults in cli options.
     Warning: does not work with defaultdict because of <key in mapping> usage!
     """
     def __missing__(self, key):
@@ -92,11 +92,11 @@ def set_sql_from_params(sql_config: ChainMap) -> Sql:
 
 def get_config_options(config: str,
                        **params: dict) -> Tuple[ChainMap, ChainMap, ChainMap]:
-    """ Gather config params from cli, dotenv and configfile and get settings
-            where cli > dotenv > configfile.
-        Also applies debugging setting (as early as possible)
+    """ Gather config params from cli, dotenv and configfile and get settings.
 
-        return dicts containing unified settings for app, mqtt and sql
+    Use this Order: cli > dotenv > configfile.
+    Also applies debugging setting (as early as possible)
+    Returns ChainMaps containing unified settings for app, mqtt and sql
     """
     app_cli, mqtt_cli, sql_cli = get_cli_params(params)
     app_dotenv, mqtt_dotenv, sql_dotenv = get_dotenv_params()
