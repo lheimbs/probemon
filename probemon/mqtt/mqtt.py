@@ -13,8 +13,25 @@ class Mqtt(object):
     _port = None
     _user = None
     _password = None
+    _topic = None
     _ca_certs = _certfile = _keyfile = None
     _debug = False
+
+    def __init__(self) -> None:
+        """initiate the mqtt client, """
+        if Mqtt.is_enabled():
+            self._client = mqtt_client.Client()
+            self._client.username_pw_set(Mqtt._user, Mqtt._password)
+            if Mqtt._ca_certs or (Mqtt._certfile and Mqtt._keyfile):
+                self._client.tls_set(
+                    ca_certs=Mqtt._ca_certs,
+                    certfile=Mqtt._certfile,
+                    keyfile=Mqtt._keyfile
+                )
+            if Mqtt._debug:
+                self._client.enable_logger(logger.setLevel(logging.DEBUG))
+        else:
+            self._client = None
 
     def is_enabled() -> bool:
         return Mqtt._enabled
@@ -49,6 +66,18 @@ class Mqtt(object):
         Mqtt._port = port
         Mqtt.enable()
 
+    def set_user(user, password) -> None:
+        """Set mqtt user and password.
+
+        Only allowed if host/port are set (ie Mqtt is enabled)
+        """
+        if Mqtt.is_enabled():
+            logger.debug(
+                f"Setting mqtt user {user} with password {password}."
+            )
+            Mqtt._user = str(user)
+            Mqtt._password = str(password)
+
     def set_topic(topic: str) -> None:
         if Mqtt.is_enabled() and topic:
             logger.debug(f"Setting mqtt topic: {topic}")
@@ -57,14 +86,6 @@ class Mqtt(object):
             logger.warning("A mqtt topic is required. Disabling mqtt!")
             Mqtt.disable()
 
-    def set_user(user, password) -> None:
-        if Mqtt.is_enabled():
-            logger.debug(
-                f"Setting mqtt user {user} with password {password}."
-            )
-            Mqtt._user = str(user)
-            Mqtt._password = str(password)
-
     def set_tls(ca_certs: str, certfile: str, keyfile: str) -> None:
         if Mqtt.is_enabled() and (ca_certs or (certfile and keyfile)):
             logger.debug(
@@ -72,32 +93,16 @@ class Mqtt(object):
                 f"ca_certs file {ca_certs}, "
                 f"certfile {certfile} and keyfile {keyfile}."
             )
-            Mqtt._ca_certs = ca_certs
-            Mqtt._certfile = certfile
-            Mqtt._keyfile = keyfile
+            Mqtt._ca_certs = ca_certs if ca_certs else None
+            Mqtt._certfile = certfile if certfile else None
+            Mqtt._keyfile = keyfile if keyfile else None
 
     def enable_debugging() -> None:
         logger.debug("Enabling mqtt client debugging.")
         Mqtt._debug = True
 
-    def __init__(self) -> None:
-        """initiate the mqtt client, """
-        if Mqtt.is_enabled():
-            self._client = mqtt_client.Client()
-            self._client.username_pw_set(Mqtt._user, Mqtt._password)
-            if Mqtt._ca_certs or (Mqtt._certfile and Mqtt._keyfile):
-                self._client.tls_set(
-                    ca_certs=Mqtt._ca_certs,
-                    certfile=Mqtt._certfile,
-                    keyfile=Mqtt._keyfile
-                )
-            if Mqtt._debug:
-                self._client.enable_logger(logger.setLevel(logging.DEBUG))
-        else:
-            self._client = None
-
     def __enter__(self):
-        if self._client is not None:
+        if Mqtt.is_enabled() and self._client is not None:
             logger.debug("Connecting to mqtt broker...")
             try:
                 self._client.connect(Mqtt._host, port=Mqtt._port)
