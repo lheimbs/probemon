@@ -12,17 +12,13 @@ from maclookup.exceptions.not_enough_credits_exception \
     import NotEnoughCreditsException
 
 logger = logging.getLogger(__name__)
-logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
-logging.getLogger('maclookup-requester').setLevel(logging.WARNING)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
+logging.getLogger('maclookup-requester').setLevel(logging.CRITICAL)
 REQUEST_TIMEOUT = 2.0
 
-def get_mac_vendor(
-    mac: str,
-    maclookup_api_key: str = "",
-    unknown_vendor: str = "",
-    lower: bool = False,
-    offline: bool = False,
-):
+def get_mac_vendor(mac: str, maclookup_api_key: str = "",
+                   unknown_vendor: str = "", lower: bool = False,
+                   offline: bool = False):
     if not mac:
         logger.debug("Empty mac! Skipping vendor search.")
         return unknown_vendor or os.environ.get('MAC_VENDOR_UNKNOWN', '')
@@ -47,13 +43,19 @@ def get_mac_vendor(
 def get_netaddr_vendor(mac: str, *_):
     vendor = ''
     logger.debug("Trying module netaddr (fastest, but few entries).")
-    if not mac:
-        return vendor
-
     try:
-        parsed_mac = netaddr.EUI(mac)
-        vendor = parsed_mac.oui.registration().org
-    except netaddr.core.NotRegisteredError:
+        parsed_mac = netaddr.EUI(mac).oui
+    except (netaddr.core.AddrFormatError, netaddr.core.NotRegisteredError):
+        parsed_mac = None
+    if parsed_mac is None:
+        try:
+            parsed_mac = netaddr.OUI(mac)
+        except (ValueError, netaddr.core.NotRegisteredError):
+            pass
+
+    if parsed_mac is not None:
+        vendor = parsed_mac.registration().org
+    else:
         logger.debug(f"netaddr could not find vendor for mac '{mac}'.")
     return vendor
 
@@ -62,8 +64,6 @@ def get_maclookup_vendor(mac: str, maclookup_api_key: str):
     """ macaddress.io maclookup api """
     logger.debug("Trying module maclookup (needs api key).")
     vendor = ''
-    if not maclookup_api_key:
-        maclookup_api_key = os.environ.get('MACLOOKUP_API_KEY', '')
 
     if maclookup_api_key:
         try:
@@ -104,7 +104,7 @@ def get_macvendorlookup_com_vendor(mac: str, *_):
     elif result.status_code == 429:
         logger.warning(f"Rate limit reached for '{url}'.")
     if not vendor:
-        logger.debug("Error getting vendor from macvendorlookup.")
+        logger.debug("Error getting vendor from macvendorlookup.com.")
     return vendor
 
 
@@ -156,5 +156,5 @@ def get_macvendors_com_vendor(mac: str, *_):
     elif result.status_code == 429:
         logger.warning(f"Rate limit reached for '{url}'.")
     if not vendor:
-        logger.debug("Error getting vendor from macvendors.co.")
+        logger.debug("Error getting vendor from api.macvendors.com.")
     return vendor
