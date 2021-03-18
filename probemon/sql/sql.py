@@ -1,10 +1,10 @@
 import logging
-from typing import TypeVar
+from typing import TypeVar, Union
 
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import StaticPool
-# from contextlib import contextmanager
+from sqlalchemy.exc import NoSuchModuleError
 
 from ..mac import Mac
 from ..probe_request import Base, ProbeRequestModel
@@ -40,7 +40,7 @@ class Sql:
             else:
                 self._engine = sqlalchemy.create_engine(url)
             Sql.enable()
-        except ModuleNotFoundError:
+        except (ModuleNotFoundError, NoSuchModuleError):
             logger.exception(
                 "Could not create sql connection because "
                 "a neccessary python module is missing."
@@ -48,12 +48,11 @@ class Sql:
             self._engine = None
 
     def register(self, drop_tables: bool = False) -> None:
-        Session_cls = None
         if self._engine is not None and Sql.is_enabled():
             logger.debug("Making sql metadata...")
             Base.metadata.create_all(self._engine)
             logger.debug("Getting sql scoped session...")
-            Session_cls = scoped_session(sessionmaker(bind=self._engine))
+            Sql._Session = scoped_session(sessionmaker(bind=self._engine))
         else:
             logger.debug(
                 "Can't configure Sql-Session because "
@@ -61,9 +60,9 @@ class Sql:
                 "Disabling sql!"
             )
             Sql.disable()
-        Sql._Session = Session_cls
+            Sql._Session = None
 
-    def publish_probe(probe: ProbeRequest) -> None:
+    def publish_probe(probe: ProbeRequest) -> Union[ProbeRequestModel, None]:
         if Sql.is_enabled() and Sql._Session is not None:
             probe_model = probe.model()
             if probe_model:
@@ -79,6 +78,8 @@ class Sql:
                     raise
                 finally:
                     session.close()
+                return probe_model
+        return None
 
     def get_vendor(mac: Mac) -> str:
         if Sql.is_enabled() and Sql._Session is not None:
