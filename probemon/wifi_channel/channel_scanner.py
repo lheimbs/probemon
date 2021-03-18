@@ -331,6 +331,7 @@ class ChannelScanner:
                 time.sleep(self.__wait_time)
             if ssid in self._get_scanned_ssids():
                 break
+        self._stop_sniffer()
         scanned = self._get_scanned_ssid_channels()
         if ssid in scanned:
             channel, n_channel = self._get_max_scanned_channel(scanned[ssid])
