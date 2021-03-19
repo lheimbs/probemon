@@ -72,7 +72,7 @@ def get_maclookup_vendor(mac: str, maclookup_api_key: str):
         except AuthorizationRequiredException:
             logger.warning("Given api key for maclookup is invalid.")
         except NotEnoughCreditsException:
-            logger.warning(
+            logger.info(
                 "Maclookups free 1000 daily requests limit reached."
             )
     else:
@@ -90,19 +90,19 @@ def get_macvendorlookup_com_vendor(mac: str, *_):
     except (
         requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
     ):
-        logger.warning(f"Request to {url} timed out.")
+        logger.info(f"Request to {url} timed out.")
         return vendor
 
     if result.status_code == 200:
         try:
             result = result.json()
         except json.decoder.JSONDecodeError:
-            logger.warning("Could not json decode macvendorlookup response.")
+            logger.exception("Could not json decode macvendorlookup response.")
 
         if isinstance(result, list) and result and 'company' in result[0]:
             vendor = result[0]['company']
     elif result.status_code == 429:
-        logger.warning(f"Rate limit reached for '{url}'.")
+        logger.info(f"Rate limit reached for '{url}'.")
     if not vendor:
         logger.debug("Error getting vendor from macvendorlookup.com.")
     return vendor
@@ -117,19 +117,19 @@ def get_macvendors_co_vendor(mac: str, *_):
     except (
         requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
     ):
-        logger.warning(f"Request to {url} timed out.")
+        logger.info(f"Request to {url} timed out.")
         return vendor
 
     if result.status_code == 200:
         try:
             result = result.json()
         except json.decoder.JSONDecodeError:
-            logger.warning("Could not json decode macvendors.co response.")
+            logger.exception("Could not json decode macvendors.co response.")
 
         if 'result' in result and 'company' in result['result']:
             vendor = result['result']['company']
     elif result.status_code == 429:
-        logger.warning(f"Rate limit reached for '{url}'.")
+        logger.info(f"Rate limit reached for '{url}'.")
     if not vendor:
         logger.debug("Error getting vendor from macvendors.co.")
     return vendor
@@ -145,7 +145,7 @@ def get_macvendors_com_vendor(mac: str, *_):
     except (
         requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout,
     ):
-        logger.warning(f"Request to {url} timed out.")
+        logger.info(f"Request to {url} timed out.")
         return vendor
 
     if result.status_code == 200:
@@ -154,7 +154,7 @@ def get_macvendors_com_vendor(mac: str, *_):
             # other than a simple vendor string
             vendor = result.text
     elif result.status_code == 429:
-        logger.warning(f"Rate limit reached for '{url}'.")
+        logger.info(f"Rate limit reached for '{url}'.")
     if not vendor:
         logger.debug("Error getting vendor from api.macvendors.com.")
     return vendor

@@ -107,7 +107,7 @@ class MaclookupUnitTest(TestCase):
             res = vendor.get_maclookup_vendor(self.mac_with_valid_oui.oui, 'PROBEMON_MACLOOKUP_API_KEY')
         self.assertEqual(res, '')
         self.assertIn(
-            'WARNING:probemon.mac_vendor.vendor:Maclookups free 1000 daily requests limit reached.',
+            'INFO:probemon.mac_vendor.vendor:Maclookups free 1000 daily requests limit reached.',
             log.output
         )
 
@@ -140,7 +140,7 @@ class MacvendorlookupComUnitTest(TestCase):
     @responses.activate
     def test_result_status_code_rate_limit_reached(self):
         responses.add(responses.GET, url=self.url, status=429)
-        with self.assertLogs(vendor.logger, 'WARNING') as log:
+        with self.assertLogs(vendor.logger, 'INFO') as log:
             res = vendor.get_macvendorlookup_com_vendor(self.mac_with_valid_oui.oui)
         self.assertEqual(res, '')
         self.assertIn('Rate limit reached for ', log.output[0])
@@ -181,7 +181,7 @@ class MacvendorsCoUnitTest(TestCase):
     @responses.activate
     def test_result_status_code_rate_limit_reached(self):
         responses.add(responses.GET, url=self.url, status=429)
-        with self.assertLogs(vendor.logger, 'WARNING') as log:
+        with self.assertLogs(vendor.logger, 'INFO') as log:
             res = vendor.get_macvendors_co_vendor(self.mac_with_valid_oui.oui)
         self.assertEqual(res, '')
         self.assertIn('Rate limit reached for ', log.output[0])
@@ -222,7 +222,7 @@ class MacvendorsComUnitTest(TestCase):
     @responses.activate
     def test_result_status_code_rate_limit_reached(self):
         responses.add(responses.GET, url=self.url, status=429)
-        with self.assertLogs(vendor.logger, 'WARNING') as log:
+        with self.assertLogs(vendor.logger, 'INFO') as log:
             res = vendor.get_macvendors_com_vendor(self.mac_with_valid_oui.oui)
         self.assertEqual(res, '')
         self.assertIn('Rate limit reached for ', log.output[0])
