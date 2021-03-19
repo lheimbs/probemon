@@ -1,13 +1,12 @@
 import os
-import logging
 import configparser
-from typing import Union
+from typing import Tuple
 
-logger = logging.getLogger(__name__)
+from .misc import convert_option_type
 
 def get_configfile_params(
     config_path: str = ""
-) -> Union[dict, dict, dict, list]:
+) -> Tuple[dict, dict, dict, list]:
     basedir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
     )
@@ -32,15 +31,3 @@ def get_configfile_params(
         sql[key] = convert_option_type(value)
 
     return app, mqtt, sql, ret_val
-
-
-def convert_option_type(value):
-    if value and isinstance(value, str) and value.lower() == 'false':
-        new_value = False
-    elif value and isinstance(value, str) and value.isnumeric():
-        new_value = int(value)
-    elif not value:
-        new_value = None
-    else:
-        new_value = value
-    return new_value
