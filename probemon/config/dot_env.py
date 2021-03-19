@@ -1,20 +1,17 @@
 import os
-from typing import Union
+from typing import Tuple
 from dotenv import load_dotenv
 
-def get_dotenv_params() -> Union[dict, dict, dict]:
+from .misc import convert_option_type
+
+def get_dotenv_params() -> Tuple[dict, dict, dict]:
     load_dotenv(verbose=True)
 
     app = {}
     mqtt = {}
     sql = {}
     for key, value in os.environ.items():
-        if value and isinstance(value, str) and value.lower() == 'false':
-            value = False
-        elif value and isinstance(value, str) and value.isnumeric():
-            value = int(value)
-        elif not value:
-            value = None
+        value = convert_option_type(value)
 
         if key.lower().startswith("probemon_"):
             key = key.lower().replace("probemon_", '')
