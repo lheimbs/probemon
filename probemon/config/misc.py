@@ -1,7 +1,34 @@
+from collections import ChainMap
 import logging
 from urllib.parse import quote_plus as url_quote_plus
 
 logger = logging.getLogger(__name__)
+
+
+class IgnoreNoneChainMap(ChainMap):
+    """A ChainMap that ignores None entries in the map.
+
+    It allows defining defaults in cli options.
+    Warning: does not work with defaultdict because of <key in mapping> usage!
+    """
+    def __missing__(self, key):
+        return None
+
+    def __getitem__(self, key):
+        for mapping in self.maps:
+            if key in mapping.keys() and mapping[key] is not None:
+                return mapping[key]
+        return self.__missing__(key)
+
+    def get_all(self, key: str, ignore_none: bool = False) -> list:
+        """Get all entries from all dicts that match key"""
+        values = []
+        for mapping in self.maps:
+            if key in mapping.keys():
+                if (ignore_none and mapping[key] is not None) \
+                        or not ignore_none:
+                    values.append(mapping[key])
+        return values
 
 
 def convert_option_type(value):

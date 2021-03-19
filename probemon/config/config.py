@@ -5,7 +5,7 @@ from typing import Tuple
 
 import netaddr
 
-from .misc import get_url
+from .misc import get_url, IgnoreNoneChainMap
 from .cli import get_cli_params
 from .dot_env import get_dotenv_params
 from .config_file import get_configfile_params
@@ -18,23 +18,7 @@ from ..probe_request import ProbeRequest
 logger = logging.getLogger(__name__)
 
 
-class IgnoreNoneChainMap(ChainMap):
-    """A ChainMap that ignores None entries in the map.
-
-    It allows defining defaults in cli options.
-    Warning: does not work with defaultdict because of <key in mapping> usage!
-    """
-    def __missing__(self, key):
-        return None
-
-    def __getitem__(self, key):
-        for mapping in self.maps:
-            if key in mapping.keys() and mapping[key] is not None:
-                return mapping[key]
-        return self.__missing__(key)
-
-
-def set_mqtt_from_params(mqtt_config: ChainMap) -> None:
+def set_mqtt_from_params(mqtt_config: IgnoreNoneChainMap) -> None:
     Mqtt.set_server(mqtt_config['host'], mqtt_config['port'])
     Mqtt.set_topic(mqtt_config['topic'])
     Mqtt.set_user(mqtt_config['user'], mqtt_config['password'])
@@ -57,7 +41,7 @@ def set_mqtt_from_params(mqtt_config: ChainMap) -> None:
                 logger.info(f"    {key:10}: {value}")
 
 
-def set_sql_from_params(sql_config: ChainMap) -> Sql:
+def set_sql_from_params(sql_config: IgnoreNoneChainMap) -> Sql:
     sql = Sql()
     if not sql_config['dialect']:
         logger.debug("No sql dialect supplied.")
