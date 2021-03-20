@@ -1,6 +1,10 @@
-from collections import ChainMap
 import logging
+from collections import ChainMap
 from urllib.parse import quote_plus as url_quote_plus
+
+import netaddr
+
+from ..mac import Mac
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +51,11 @@ def convert_option_type(value):
 
 def get_url(
     dialect: str,
-    user: str,
-    password: str,
-    host: str,
-    port: int,
-    database: str,
+    host: str = "",
+    port: int = 0,
+    user: str = "",
+    password: str = "",
+    database: str = "",
     driver: str = "",
     sqlite_path: str = "",
     **kwargs,
@@ -85,3 +89,16 @@ def get_url(
         url = url + "?" + kwargs['kwargs']
     logger.debug(f"Sql url: '{url}'.")
     return url
+
+
+def set_mac_dialect(dialect: str) -> None:
+    if dialect:
+        mac_dialect = f"mac_{dialect.lower()}"
+        if hasattr(netaddr, mac_dialect):
+            dialect = getattr(netaddr, mac_dialect)
+            Mac.dialect = dialect
+        else:
+            logger.warning(
+                f"Could not import MAC dialect {mac_dialect}. "
+                f"Using fallback {Mac.dialect}."
+            )

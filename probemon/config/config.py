@@ -3,17 +3,13 @@ import logging
 from collections import ChainMap
 from typing import Tuple
 
-import netaddr
-
-from .misc import get_url, IgnoreNoneChainMap
+from .misc import get_url, IgnoreNoneChainMap, set_mac_dialect
 from .cli import get_cli_params
 from .dot_env import get_dotenv_params
 from .config_file import get_configfile_params
-from ..mac import Mac
 from ..sql import Sql
 from ..mqtt import Mqtt
 from ..probe_request import ProbeRequest
-# from ..probes import Session
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +18,14 @@ def set_mqtt_from_params(mqtt_config: IgnoreNoneChainMap) -> None:
     Mqtt.set_server(mqtt_config['host'], mqtt_config['port'])
     Mqtt.set_topic(mqtt_config['topic'])
     Mqtt.set_user(mqtt_config['user'], mqtt_config['password'])
-    for file in ['ca_certs', 'certfile', 'keyfile']:
-        if mqtt_config[file] and not os.path.exists(mqtt_config[file]):
-            logger.error(f"{file} '{mqtt_config[file]}' does not exist!")
-            mqtt_config[file] = None
-    Mqtt.set_tls(
-        mqtt_config['ca_certs'],
-        mqtt_config['certfile'],
-        mqtt_config['keyfile']
-    )
+    tls_files = {'ca_certs': None, 'certfile': None, 'keyfile': None}
+    for file in tls_files:
+        if mqtt_config[file]:
+            if os.path.exists(mqtt_config[file]):
+                tls_files[file] = mqtt_config[file]
+            else:
+                logger.error(f"{file} '{mqtt_config[file]}' does not exist!")
+    Mqtt.set_tls(**tls_files)
     if mqtt_config['debug']:
         Mqtt.enable_debugging()
 
@@ -69,6 +64,7 @@ def set_sql_from_params(sql_config: IgnoreNoneChainMap) -> Sql:
                 "and no data will get published to a sql database."
             )
         return sql
+    # TODO: what if get_url params are missing from config?
     url = get_url(**sql_config)
     sql.set_url(url)
     return sql
@@ -95,36 +91,21 @@ def get_config_options(config: str,
     mqtt = IgnoreNoneChainMap(mqtt_cli, mqtt_dotenv, mqtt_file)
     sql = IgnoreNoneChainMap(sql_cli, sql_dotenv, sql_file)
 
-    if app['debug']:
-        logger.setLevel(logging.DEBUG)
-        for handler in logger.handlers:
-            handler.setLevel(logging.DEBUG)
-        logger.debug("Debugging enabled.")
+    # if app['debug']:
+    #     logger.setLevel(logging.DEBUG)
+    #     for handler in logger.handlers:
+    #         handler.setLevel(logging.DEBUG)
+    #     logger.debug("Debugging enabled.")
 
     if parsed_files:
         logger.debug(
             f"Using data from config files {', '.join(parsed_files)}"
         )
-    else:
-        logger.debug("No config file found.")
 
     logger.debug(
         f"APP  config: {dict([(key, value) for key, value in app.items()])}."
     )
     return app, mqtt, sql
-
-
-def set_mac_dialect(dialect):
-    if dialect:
-        mac_dialect = f"mac_{dialect.lower()}"
-        if hasattr(netaddr, mac_dialect):
-            dialect = getattr(netaddr, mac_dialect)
-            Mac.dialect = dialect
-        else:
-            logger.warning(
-                f"Could not import MAC dialect {mac_dialect}. "
-                f"Using fallback {Mac.dialect}."
-            )
 
 
 def get_config(config: str, **params: dict) -> ChainMap:

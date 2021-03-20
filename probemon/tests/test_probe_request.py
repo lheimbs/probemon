@@ -6,14 +6,17 @@ from unittest import TestCase, mock
 
 from ..probe_request import ProbeRequest, ProbeRequestModel
 
+def reset_probe():
+    ProbeRequest.lower = False
+    ProbeRequest.raw = False
+    ProbeRequest.get_vendor = False
+    ProbeRequest.vendor_offline = False
+    ProbeRequest.maclookup_api_key = ""
+
 
 class ProbeRequestUnitTest(TestCase):
     def setUp(self) -> None:
-        ProbeRequest.lower = False
-        ProbeRequest.raw = False
-        ProbeRequest.get_vendor = False
-        ProbeRequest.vendor_offline = False
-        ProbeRequest.maclookup_api_key = ""
+        reset_probe()
         return super().setUp()
 
     def tearDown(self) -> None:

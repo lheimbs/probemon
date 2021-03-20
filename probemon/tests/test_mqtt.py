@@ -4,6 +4,17 @@ from unittest import TestCase, mock
 from ..mqtt import Mqtt
 
 
+def reset_mqtt():
+    Mqtt._enabled = False
+    Mqtt._host = None
+    Mqtt._port = None
+    Mqtt._user = None
+    Mqtt._password = None
+    Mqtt._topic = None
+    Mqtt._ca_certs = Mqtt._certfile = Mqtt._keyfile = None
+    Mqtt._debug = False
+
+
 class FakeClient():
     def __init__(self, *args, **kwargs):
         self.connected = False
@@ -37,14 +48,7 @@ class MqttUnitTest(TestCase):
 
     def tearDown(self) -> None:
         logging.disable(logging.NOTSET)
-        Mqtt._enabled = False
-        Mqtt._host = None
-        Mqtt._port = None
-        Mqtt._user = None
-        Mqtt._password = None
-        Mqtt._topic = None
-        Mqtt._ca_certs = Mqtt._certfile = Mqtt._keyfile = None
-        Mqtt._debug = False
+        reset_mqtt()
         return super().tearDown()
 
     def test_init_without_any_configuraiton(self):

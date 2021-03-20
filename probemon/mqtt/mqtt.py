@@ -87,15 +87,17 @@ class Mqtt(object):
             Mqtt.disable()
 
     def set_tls(ca_certs: str, certfile: str, keyfile: str) -> None:
-        if Mqtt.is_enabled() and (ca_certs or (certfile and keyfile)):
+        if Mqtt.is_enabled():
             logger.debug(
                 "Setting tls encryption with "
                 f"ca_certs file {ca_certs}, "
                 f"certfile {certfile} and keyfile {keyfile}."
             )
-            Mqtt._ca_certs = ca_certs if ca_certs else None
-            Mqtt._certfile = certfile if certfile else None
-            Mqtt._keyfile = keyfile if keyfile else None
+            if ca_certs:
+                Mqtt._ca_certs = ca_certs
+            if certfile and keyfile:
+                Mqtt._certfile = certfile
+                Mqtt._keyfile = keyfile
 
     def enable_debugging() -> None:
         logger.debug("Enabling mqtt client debugging.")
