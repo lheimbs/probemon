@@ -199,3 +199,8 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 ```
+
+## TODOs
+- [ ] clean up configuraiton (maybe replace/add with [simple-settings](https://github.com/drgarcia1986/simple-settings)?)
+- [ ] use [rich](https://github.com/willmcgugan/rich) for console output?
+- [ ] access channel tool from main
