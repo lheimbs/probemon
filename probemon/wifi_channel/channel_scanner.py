@@ -1,4 +1,5 @@
 import re
+import sys
 import json
 import time
 import shlex
@@ -6,44 +7,82 @@ import random
 import logging
 import threading
 import subprocess
-from typing import Callable, Sequence, Tuple
+from enum import Enum
+from typing import Callable, List, Tuple
 from scapy.error import Scapy_Exception
-from scapy.layers.dot11 import RadioTap
-from scapy.all import (
-    Dot11Beacon, Dot11ProbeResp, Dot11, Dot11Elt, AsyncSniffer
-)
-logger = logging.getLogger(__name__)
+from scapy.layers.dot11 import RadioTap, Dot11Beacon, Dot11ProbeResp
+from scapy.all import AsyncSniffer
+from . import misc
+from . import LOGGER_NAME
+
+logger = logging.getLogger(LOGGER_NAME)
+
+class FREQUENCIES(Enum):
+    _ALL = None
+    _2GHz = True
+    _5GHz = False
+
+
+class CHANNELS(Enum):
+    _ALL = None
+    _POPULAR = True
+    _POPULATED = False
+
 
 class ChannelScanner:
-    def __init__(
-        self, interface: str, wait_time: int = 1, console: bool = False,
-    ):
-        self._interface = interface
-        self.__sniffer = AsyncSniffer(
-            iface=self._interface, prn=self.sniff_packet()
+    def __init__(self,
+                 interface: str,
+                 wait_time: int = 1,
+                 console: bool = False) -> None:
+        misc.can_use_interface(interface)
+        misc.can_use_iw()
+        self._interface: str = interface
+        self._sniffer: AsyncSniffer = AsyncSniffer(
+            iface=self._interface, prn=self._sniff_packet()
         )
-        self.__available_channels = []
-        self.__access_points = []
-        self.__wait_time = wait_time
-        self.__console = console
+        self._available_channels: List[int] = []
+        self._access_points: list[misc.AccessPoint] = []
+        self._wait_time: float = wait_time
+        self._console: bool = console
 
+    """ ---------- SNIFFER CONTROL ---------- """
     def _start_sniffer(self) -> bool:
-        self.__sniffer.start()
-        return True
+        """Try to start scapy AsyncSniffer if it is not already running.
+
+        Returns the sniffers running state.
+        """
+        if not self._sniffer.running:
+            self._sniffer.start()
+        return self._sniffer.running
 
     def _stop_sniffer(self) -> bool:
-        try:
-            self.__sniffer.stop()
-            return True
-        except Scapy_Exception:
-            logger.error(
-                "Something failed stopping scapy sniffer. "
-                "Try running as root."
-            )
-            return False
+        """Try to stop the sniffer.
 
+        If the sniffer can't be stopped, terminate the program
+        in order to release all daemon threads which could potentially
+        turn into memory hogs.
+        Returns the runing state of the sniffer.
+        """
+        try:
+            if self._sniffer.running:
+                self._sniffer.stop()
+            return self._sniffer.running
+        except Scapy_Exception:
+            logger.critical(
+                "ERROR stopping scapy AsyncSniffer! Terminating program.",
+                exc_info=True
+            )
+            sys.exit("ERROR stopping scapy AsyncSniffer! Terminating program.")
+
+    """ ---------- AVAILABLE CHANNELS ---------- """
     def _get_channels(self) -> list:
-        if not self.__available_channels:
+        """Call 'iw list' and parse channels listed channels of iface.
+
+        This is definitely not optimal, because of iw-dependency and
+        because ist based on only one 'phy' entry.
+        But since I have not found a better solution yet...
+        """
+        if not self._available_channels:
             logger.debug("Getting channels for local wifi adapter.")
             CHANNEL_REGEX = re.compile(
                 r"\*\s(?P<frequency>\d{4})\sMHz\s\[(?P<channel>\d{1,3})\]"
@@ -51,92 +90,60 @@ class ChannelScanner:
             proc = subprocess.run(
                 ['iw', 'list'], stdout=subprocess.PIPE, encoding='utf-8',
             )
+            channels = set()
             for line in proc.stdout.splitlines():
                 m = CHANNEL_REGEX.search(line)
                 if m and '(disabled)' not in line:
-                    self.__available_channels.append(int(m.group('channel')))
-        return self.__available_channels
+                    channels.add(int(m.group('channel')))
+            self._available_channels = sorted(list(channels))
+        return self._available_channels
 
-    def set_channel(self, channel: int) -> bool:
-        """ Change the channel on the specified wifi interface """
-        if channel not in self._get_channels():
-            logger.error(f"Channel {channel} not available for this device!")
-            return False
+    def _get_channels_by_frequency(
+            self,
+            frequency: FREQUENCIES = FREQUENCIES._ALL,
+            channels: list = None) -> list:
+        """Get available channels by frequency.
 
-        cmd = "iw dev {} set channel {}".format(self._interface, channel)
-        proc = subprocess.run(
-            shlex.split(cmd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            encoding='utf-8',
-        )
-        if proc.returncode == 0:
-            ret_val = True
-            logger.info(
-                f"Interface '{self._interface}' set to channel {channel}."
-            )
-        else:
-            ret_val = False
-            stdout = " ".join(proc.stdout.splitlines())
-            logger.error(
-                f"Failed setting channel {channel} on "
-                f"interface '{self._interface}': '{stdout}'"
-            )
+        Keyword arguments:
+        frequency -- True: return the 2GHz spectrum.
+                     False: return the 5GHz spectrum.
+                     None: return all frequencies.
+        channels -- List of preselected channels to use instead of all
+                    available.
+        """
+        channels_list = channels if channels else self._get_channels()
+        if frequency is FREQUENCIES._2GHz:
+            channels_list = list(filter(lambda x: x < 15, channels_list))
+        elif frequency is FREQUENCIES._5GHz:
+            channels_list = list(filter(lambda x: x > 14, channels_list))
+        return channels_list
 
-        self._print(
-            f"Scan channel {channel:2}...",
-            f"{len(set(self._get_scanned_channels())):3}"
-            " distinct channels found..."
-        )
-        return ret_val
+    """ ---------- CALLBACKS ---------- """
+    def _sniff_packet(self) -> Callable:
+        """Process and save unique sniffed Beacons and ProbeResponses.
 
-    def sniff_packet(self) -> Callable:
-        """ process unique sniffed Beacons and ProbeResponses """
+        Returns a Callable that has access to 'self' where the
+        recorded data is saved.
+        APs that use the same channel/bssid/ssid/encryption are counted.
+        """
         def parse_sniffed_packet(packet: RadioTap):
-            if (
-                (packet.haslayer(Dot11Beacon)
-                    or packet.haslayer(Dot11ProbeResp))
-                and packet[Dot11].addr3 not in [
-                    ap['bssid'] for ap in self.__access_points
-                ]
-            ):
-                capability = packet.sprintf(
-                    "{Dot11Beacon:%Dot11Beacon.cap%}"
-                    "{Dot11ProbeResp:%Dot11ProbeResp.cap%}"
-                )
-                ap = {
-                    'bssid': packet[Dot11].addr3,
-                    'channel': int(ord(packet[Dot11Elt:3].info)),
-                    'enc': 'y' if re.search("privacy", capability) else 'n',
-                    'ssid': packet[Dot11Elt].info.decode('utf-8')
-                }
-
+            if packet.haslayer(Dot11Beacon) \
+                    or packet.haslayer(Dot11ProbeResp):
                 # Save discovered AP
-                self.__access_points.append(ap)
+                ap = misc.AccessPoint(packet)
+                for found_ap in self._access_points:
+                    if ap == found_ap:
+                        found_ap.count += 1
+                        break
+                else:
+                    self._access_points.append(ap)
                 # Display discovered AP
-                logger.debug(f"Detected AP {json.dumps(ap)}")
+                logger.debug(f"Detected AP {json.dumps(ap.__dict__)}")
         return parse_sniffed_packet
 
-    def get_channel_utilization(self) -> int:
-        counts = self._get_channel_count(skip_zero=True)
-        (
-            max_used_channel, max_used_channel_amount
-        ) = self._get_max_used_channel()
-        found_channels = ', '.join(
-            [f'channel {ch}: {num}x' for ch, num in counts.items()]
-        )
-        channel_info = (
-            f"Found {found_channels}. Channel {max_used_channel} "
-            f"is the most populated ({max_used_channel_amount} APs)."
-        ) if counts else "Found zero aps and therefore zero channel info."
-
-        logger.info(channel_info)
-        self._print(channel_info, keep=True)
-        return max_used_channel
-
-    def _async_hopper(
-        self, channels_list: Sequence, hop_time: float, random_hops: bool,
-    ):
+    def _async_hopper(self,
+                      channels_list: List,
+                      random_hops: bool) -> Callable:
         def hopper():
             channel_nr = 0
             while True:
@@ -148,204 +155,267 @@ class ChannelScanner:
                     channel = channels_list[channel_nr]
                     channel_nr += 1
                 self.set_channel(channel)
-                time.sleep(hop_time)
+                time.sleep(self._wait_time)
         return hopper
 
-    def _get_scanned_channels(self) -> list:
-        return [
-            ap['channel'] for ap in self.__access_points
-            if 'channel' in ap.keys()
-        ]
+    """ ---------- RECORDING ANALYSIS ---------- """
+    def _get_max_used_channel(self, ssid: str = '') -> Tuple[int, int]:
+        """Get the most used channel along with its count.
 
-    def _get_scanned_ssids(self) -> set:
-        return {
-            ap['ssid'] for ap in self.__access_points
-            if 'ssid' in ap.keys()
-        }
+        If ssid is supplied, consider only those entries with that ssid.
+        Returns: <channel>, <count of channel>
+        """
+        channel, channel_used_max = 0, 0
+        for ap in self._access_points:
+            if (ssid == ap.ssid or not ssid) and ap.channel > 0:
+                if ap.count > channel_used_max:
+                    channel, channel_used_max = ap.channel, ap.count
+        return channel, channel_used_max
 
-    def _get_scanned_ssid_channels(self) -> dict:
-        ssid_dict = {}
-        for ap in self.__access_points:
-            if 'ssid' in ap.keys() and 'channel' in ap.keys():
-                if ap['ssid'] in ssid_dict.keys():
-                    if ap['channel'] in ssid_dict[ap['ssid']].keys():
-                        ssid_dict[ap['ssid']][ap['channel']] += 1
-                    else:
-                        ssid_dict[ap['ssid']][ap['channel']] = 1
+    def _get_channels_with_count(self, skip_zero: bool = True) -> dict:
+        """Get the scanned channels along with their count.
+
+        Add missing channels with count=0 if skip_zero is False.
+        """
+        channels = {}
+        for ap in self._access_points:
+            if ap.channel > 0:
+                if ap.channel in channels:
+                    channels[ap.channel] += 1
                 else:
-                    ssid_dict.update({ap['ssid']: {ap['channel']: 1}})
-        return ssid_dict
+                    channels.update({ap.channel: ap.count})
 
-    def _get_channel_count(self, skip_zero: bool = False) -> dict:
-        scanned_channels = self._get_scanned_channels()
-        counted_channels = {}
-        for channel in self._get_channels():
-            count = scanned_channels.count(channel)
-            if skip_zero and count <= 0:
-                continue
-            counted_channels.update({channel: count})
-        return counted_channels
+        if not skip_zero:
+            for channel in self._get_channels():
+                if channel not in channels:
+                    channels.update({channel: 0})
+        return channels
 
-    def _get_max_used_channel(self) -> Tuple[int, int]:
-        """Count and rank occurence of each channel per AP in recived beacons.
+    """ ---------- OUTPUT HELPERS ---------- """
+    def _print(self, *args, **kwargs) -> None:
+        if self._console:
+            end = '\r' if 'keep' in kwargs and kwargs['keep'] else '\n'
+            print(''.join(args), end=end)
+        else:
+            if 'level' in kwargs:
+                logger.log(kwargs['level'], ''.join(args))
 
-        returns: most used channel, number of times the channel is used
-        """
-        counts = self._get_channel_count(skip_zero=True)
-        if not counts:
-            logger.warning("No channels detected!")
-            return 0, 0
-        max_channel = max(counts, key=counts.get)
-        return max_channel, counts[max_channel]
+    def print_channel_utilization(self) -> int:
+        counts = self._get_channels_with_count()
+        (
+            max_used_channel, max_used_channel_amount
+        ) = self._get_max_used_channel()
+        found_channels = ', '.join(
+            [f'channel {ch}: {num}x' for ch, num in counts.items()]
+        )
+        channel_info = (
+            f"Found {found_channels}. Channel {max_used_channel} "
+            f"is the most populated ({max_used_channel_amount} APs)."
+        ) if counts else "Found zero APs and therefore no channel info."
 
-    def _get_max_scanned_channel(self, scanned: dict) -> Tuple[int, int]:
-        """Sort channels by their occurence ascending.
-
-        return: <channel number>, <number channel occurences>
-        """
-        return sorted(scanned.items(), key=lambda item: item[1])[-1]
+        self._print(channel_info, level=logging.INFO)
+        return max_used_channel
 
     def print_channel_graph_vertical(self) -> None:
-        for channel in self._get_channels():
-            count = [
-                ap['channel'] for ap in self.__access_points
-            ].count(int(channel))
-            if count:
-                bar = "█" * count if count else '▏'
-                logger.info(f"Channel #{channel:2}: {bar} {count}x")
+        """Print vertical graph for amount of collected APs per channel"""
+        channels = self._get_channels_with_count()
+        for channel, count in channels.items():
+            bar = "█" * count if count else '▏'
+            line = f"Channel #{channel:2}: {bar} {count}x"
+            self._print(line, level=logging.INFO)
 
     def print_channel_graph_horizontal(self) -> None:
-        counts = self._get_channel_count()
-        _, max_channel_amount = self._get_max_used_channel()
+        """Print horizontal graph for amount of collected APs per channel"""
+        counts = self._get_channels_with_count()
+        if not counts:
+            return
+        max_channel_amount = max(counts.values())
         for i in reversed(range(max_channel_amount+2)):
             chars = []
-            for channel in sorted(self._get_channels()):
-                if i > counts[channel]:
-                    char = '    '
-                elif i == 0:
+            for channel in counts:
+                if i == 0:
                     char = f" {channel:2} "
-                elif i == counts[channel]:
-                    char = ' ██ '
-                elif i < counts[channel] and i > 1:
-                    char = ' ██ '
+                elif i > counts[channel]:
+                    char = '    '
                 else:
                     char = ' ██ '
                 chars.append(char)
-            spaceholder = str(i)+':' if 0 < i <= max_channel_amount else '  '
-            print(f"  {spaceholder} {''.join(chars)}  ")
+            spaceholder = f'{i:2}:' if 0 < i <= max_channel_amount else '   '
+            line = f"  {spaceholder} {''.join(chars)}  "
+            self._print(line, level=logging.INFO)
 
-    def _print(self, *args, **kwargs) -> None:
-        if 'keep' in kwargs:
-            end = ''
-        else:
-            end = '\r'
-        if self.__console:
-            print(''.join(args), end=end)
+    """ ---------- RUNNERS ---------- """
+    def set_channel(self, channel: int) -> bool:
+        """Set the channel on the specified wifi interface."""
+        if channel not in self._get_channels():
+            logger.error(f"Channel {channel} not available!")
+            return False
+
+        cmd = "iw dev {} set channel {}".format(self._interface, channel)
+        proc = subprocess.run(
+            shlex.split(cmd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding='utf-8',
+        )
+        if proc.returncode == 0:
+            self._print(
+                f"Interface '{self._interface}' set to channel {channel:4}.",
+                keep=True, level=logging.INFO
+            )
+            return True
+        # else:
+        stdout = " ".join(proc.stdout.splitlines())
+        logger.error(
+            f"Failed setting channel {channel} on "
+            f"interface '{self._interface}': '{stdout}'"
+        )
+        return False
 
     def channel_scanner(self) -> int:
-        """ Channel scanner """
-        if not self._start_sniffer():
-            return 0
-        logger.info("Start channel scan...")
-        for channel in self._get_channels():
-            try:
-                self.set_channel(channel)
-                time.sleep(self.__wait_time)
-            except KeyboardInterrupt:
-                break
-        self._stop_sniffer()
-        return self.get_channel_utilization()
+        """Scan all available channels, collect all APs and report usage.
 
-    def channel_hopper(self) -> int:
-        """ Channel hopper """
-        if not self._start_sniffer():
+        Sequentially iterate over avaliable channels, waiting between
+        every step. At the end print the detected channel usage.
+        Returns the most used channel.
+        """
+        channels = self._get_channels()
+        if not channels or not self._start_sniffer():
             return 0
+        self._print("Start channel scan...", level=logging.INFO)
         try:
-            while True:
+            for channel in channels:
                 try:
-                    channel = random.choice(self._get_channels())
                     self.set_channel(channel)
-                    time.sleep(self.__wait_time)
+                    time.sleep(self._wait_time)
                 except KeyboardInterrupt:
                     break
         finally:
             self._stop_sniffer()
-        return self.get_channel_utilization()
+        return self.print_channel_utilization()
+
+    def channel_hopper(self) -> int:
+        """Randomly jump between avaliable channels forever.
+
+        Randomly jump between avaliable channels, waiting after
+        every jump unit Interrupted by Keyboard.
+        At the end print the detected channel usage.
+        Returns the most used channel.
+        """
+        channels = self._get_channels()
+        if not channels or not self._start_sniffer():
+            return 0
+        self._print("Start channel hopping...", level=logging.INFO)
+        try:
+            while True:
+                try:
+                    channel = random.choice(list(channels))
+                    self.set_channel(channel)
+                    time.sleep(self._wait_time)
+                except KeyboardInterrupt:
+                    break
+        finally:
+            self._stop_sniffer()
+        return self.print_channel_utilization()
 
     def channel_hopper_async_no_sniff(
-        self, only_populated_channels: bool,
-        hop_time: float = 1.0,
-        random_hops: bool = True,
-    ) -> None:
-        if only_populated_channels:
+            self,
+            channels: CHANNELS = CHANNELS._ALL,
+            frequency: FREQUENCIES = FREQUENCIES._ALL,
+            random_hops: bool = True) -> None:
+        """Start a Thread that changes the channel asynchronously.
+
+        The Thread is a daemon, so it runs as long as the calling
+        Program is running.
+        It can either use all available channels, only the 2GHz or 5GHz
+        spectrum, the most popular or run the channel_scanner
+        before launching the Thread, which selects only the recorded channels
+        as channels to choose from.
+
+        Keyword arguments:
+        channels -- True: Use most popular 2GHz channels 1, 6 and 12.
+                    False: Run channel_scanner and use only populated channels.
+                    None: Use all available channels (default).
+        frequency -- True: return the 2GHz spectrum.
+                     False: return the 5GHz spectrum.
+                     None: return all frequencies (default).
+        random_hops -- True: Hop randomly between available channels.
+                       False: Run sequentially through the avaiable channels.
+        """
+        if channels is CHANNELS._POPULAR:
+            channels_list = [1, 6, 12]
+        elif channels is CHANNELS._POPULATED:
             self.channel_scanner()
-            channels = self._get_channel_count(skip_zero=True)
+            channels = self._get_channels_with_count()
             channels_list = list(channels.keys())
         else:
             channels_list = self._get_channels()
 
-        logger.info("Starting channel hopper thread...")
+        channels_list = self._get_channels_by_frequency(
+            frequency, channels_list
+        )
+
+        self._print("Starting channel hopper thread...", level=logging.INFO)
         threading.Thread(
-            target=self._async_hopper(channels_list, hop_time, random_hops),
-            daemon=True
-        ).start()
-
-    def channel_hopper_async_no_sniff_2GHz(
-        self, hop_time: float = 1.0, random_hops: bool = True,
-    ) -> None:
-        channels_list = [chan for chan in self._get_channels() if chan < 14]
-
-        logger.info("Starting channel hopper thread...")
-        threading.Thread(
-            target=self._async_hopper(channels_list, hop_time, random_hops),
-            daemon=True
-        ).start()
-
-    def channel_hopper_async_no_sniff_2GHz_most_common(
-        self, hop_time: float = 1.0, random: bool = False
-    ) -> None:
-        channels_list = [1, 6, 12]
-
-        logger.info("Starting channel hopper thread...")
-        threading.Thread(
-            target=self._async_hopper(channels_list, hop_time, random),
+            target=self._async_hopper(channels_list, random_hops),
             daemon=True
         ).start()
 
     def set_auto_channel(self) -> bool:
-        logger.info("Scanning for available channels...")
+        """Set NICs channel to the most used one."""
+        self._print("Scanning for available channels...", level=logging.INFO)
         max_used_channel = self.channel_scanner()
         return self.set_channel(max_used_channel)
 
-    def ssid_searcher(self, ssid: str, only_2ghz: bool = True) -> None:
-        start = time.perf_counter()
-        if only_2ghz:
-            max_chan = 15
-        else:
-            max_chan = 9999
-        channels_list = [
-            chan for chan in self._get_channels() if chan < max_chan
-        ]
+    def ssid_searcher(self,
+                      ssid: str,
+                      frequency: FREQUENCIES = FREQUENCIES._ALL) -> int:
+        """Scan channels sequentially and set channel to AP with ssid.
+
+        Iterate over available channels, wait an amount of time during
+        which time all beacons and probes are getting collected.
+        After the loop check if the ssid exists among the recorded APs:
+
+        Select the channel under which the ssid was recieved.
+        If the ssid is used within multiple channels, select the channel
+        under which the most beacons/probes got recieved.
+        If its a tie beween channel counts, the lowest channel is selected.
+        If the ssid does not appear in the recorded beacons/probes,
+        select the most used channel regardless of ssid.
+
+        When a channel is determined, set the selected interfaces channel
+        accordingly.
+
+        Keyword arguments:
+        frequency -- True: return the 2GHz spectrum.
+                     False: return the 5GHz spectrum.
+                     None: return all frequencies.
+        Returns:
+        The channel that was set - regardless of a found ssid.
+        0 if no channels at all were found/set.
+        """
+        channels_list = self._get_channels_by_frequency(frequency)
         self._start_sniffer()
-        while time.perf_counter() - start < 30:
-            # 30s max for scanning
+        try:
             for channel in channels_list:
                 self.set_channel(channel)
-                time.sleep(self.__wait_time)
-            if ssid in self._get_scanned_ssids():
-                break
-        self._stop_sniffer()
-        scanned = self._get_scanned_ssid_channels()
-        if ssid in scanned:
-            channel, n_channel = self._get_max_scanned_channel(scanned[ssid])
-            logger.info(
-                f"Channel {channel} found {n_channel}x for SSID {ssid}."
+                time.sleep(self._wait_time)
+        finally:
+            self._stop_sniffer()
+        channel, channel_amount = self._get_max_used_channel(ssid)
+        if channel_amount:
+            self._print(
+                f"Channel {channel} used {channel_amount}x for SSID {ssid}.",
+                level=logging.INFO
             )
-            pass
         else:
-            channel, n_channel = self._get_max_used_channel()
-            logger.info(
+            # Get max used channel for all ssids.
+            channel, channel_amount = self._get_max_used_channel()
+            self._print(
                 f"SSID {ssid} not found. "
-                f"Setting most used channel: {channel} (used {n_channel}x)."
+                f"Setting most used channel {channel} ({channel_amount}x).",
+                level=logging.INFO
             )
-        self.set_channel(channel)
+        if channel:
+            self.set_channel(channel)
+        return channel
