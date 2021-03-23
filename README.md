@@ -199,3 +199,5 @@ WantedBy=multi-user.target
 - [ ] use [rich](https://github.com/willmcgugan/rich) for console output?
 - [ ] access channel tool from main
 - [ ] Add [PyRIC](https://pypi.org/project/PyRIC/) dependency to before falling back to iw (Problem: PyRICs PyPi abandoned, only maintained [here](https://github.com/wifiphisher/WiPy))?
+- [ ] Allow for multiple interfaces/nics to cover multiple channels
+
