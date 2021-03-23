@@ -50,16 +50,16 @@ class Mqtt(object):
             Mqtt.disable()
             return
 
-        if not port:
-            logger.debug("No port supplied. Using default port 1883.")
-            port = 1883
-        elif port:
+        if port:
             try:
                 port = int(port)
             except ValueError:
                 logger.error("Invalid mqtt port supplied. Disabling Mqtt!")
                 Mqtt.disable()
                 return
+        else:
+            logger.debug("No port supplied. Using default port 1883.")
+            port = 1883
 
         logger.debug(f"Setting mqtt host {host} with port {port}.")
         Mqtt._host = host

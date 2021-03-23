@@ -70,12 +70,12 @@ class Sql:
                 try:
                     session.add(probe_model)
                     session.commit()
-                except:         # noqa: E722
+                except Exception as e:
                     logger.exception(
                         "Exception occured during sql operation!"
                     )
                     session.rollback()
-                    raise
+                    raise e
                 finally:
                     session.close()
                 return probe_model
@@ -91,12 +91,12 @@ class Sql:
                 for vendor in vendors:
                     if vendor[0]:
                         return vendor[0]
-            except:         # noqa: E722
+            except Exception as e:
                 logger.exception(
                     "Exception occured during sql operation!"
                 )
                 session.rollback()
-                raise
+                raise e
             finally:
                 session.close()
         return ''

@@ -70,8 +70,23 @@ def set_sql_from_params(sql_config: IgnoreNoneChainMap) -> Sql:
     return sql
 
 
-def get_config_options(config: str,
-                       **params: dict) -> Tuple[ChainMap, ChainMap, ChainMap]:
+def set_probe_request_from_params(app_cfg: IgnoreNoneChainMap) -> None:
+    """Set ProbeRequests class variables according to the app config"""
+    if app_cfg['raw']:
+        ProbeRequest.raw = True
+    if app_cfg['lower']:
+        ProbeRequest.lower = True
+    if app_cfg['vendor']:
+        ProbeRequest.get_vendor = True
+    if app_cfg['maclookup_api_key']:
+        ProbeRequest.maclookup_api_key = app_cfg['maclookup_api_key']
+    if app_cfg['vendor_offline']:
+        ProbeRequest.vendor_offline = True
+
+
+def get_config_options(
+        config: str,
+        **params: dict) -> Tuple[ChainMap, ChainMap, ChainMap, str]:
     """ Gather config params from cli, dotenv and configfile and get settings.
 
     Use this Order: cli > dotenv > configfile.
@@ -83,35 +98,31 @@ def get_config_options(config: str,
     (
         app_file,
         mqtt_file,
-        sql_file,
-        parsed_files
+        sql_file
     ) = get_configfile_params(config)
 
     app = IgnoreNoneChainMap(app_cli, app_dotenv, app_file)
     mqtt = IgnoreNoneChainMap(mqtt_cli, mqtt_dotenv, mqtt_file)
     sql = IgnoreNoneChainMap(sql_cli, sql_dotenv, sql_file)
-
-    # if app['debug']:
-    #     logger.setLevel(logging.DEBUG)
-    #     for handler in logger.handlers:
-    #         handler.setLevel(logging.DEBUG)
-    #     logger.debug("Debugging enabled.")
-
-    if parsed_files:
-        logger.debug(
-            f"Using data from config files {', '.join(parsed_files)}"
-        )
-
-    logger.debug(
-        f"APP  config: {dict([(key, value) for key, value in app.items()])}."
-    )
     return app, mqtt, sql
 
 
 def get_config(config: str, **params: dict) -> ChainMap:
     app_cfg, mqtt_cfg, sql_cfg = get_config_options(config, **params)
+    if app_cfg['debug']:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug('Debugging enabled.')
+    elif app_cfg['verbose']:
+        logging.getLogger().setLevel(logging.INFO)
+        logger.info("Verbosity increased.")
 
-    set_mqtt_from_params(mqtt_cfg)
+    if app_cfg['parsed_files']:
+        logger.debug(
+            f"Parsed config files: {', '.join(app_cfg['parsed_files'])}"
+        )
+    logger.debug(
+        f"APP  config: {app_cfg}."
+    )
 
     sql = set_sql_from_params(sql_cfg)
     sql.register(True if app_cfg['debug'] and sql_cfg['drop_all'] else False)
@@ -121,15 +132,7 @@ def get_config(config: str, **params: dict) -> ChainMap:
             if value and key != "password":
                 logger.info(f"    {key:10}: {value}")
 
-    if app_cfg['raw']:
-        ProbeRequest.raw = True
-    if app_cfg['lower']:
-        ProbeRequest.lower = True
-    if app_cfg['vendor']:
-        ProbeRequest.get_vendor = True
-    if app_cfg['maclookup_api_key']:
-        ProbeRequest.maclookup_api_key = app_cfg['maclookup_api_key']
-    if app_cfg['vendor_offline']:
-        ProbeRequest.vendor_offline = True
+    set_mqtt_from_params(mqtt_cfg)
+    set_probe_request_from_params(app_cfg)
     set_mac_dialect(app_cfg['mac_format'])
     return app_cfg

@@ -3,24 +3,23 @@ import queue
 import logging
 import threading
 from typing import TypeVar
-from collections import ChainMap
 
 import click
 from scapy.all import sniff
 
-from .sql import Sql
-from .mqtt import Mqtt
-from .config import get_config
-from .probe_request import ProbeRequest
-from .config.cli_options import cli_options, cli_channel_options, \
-    cli_mqtt_options, cli_sql_options
-from .wifi_channel import set_wifi_channel
-from .wifi_channel.misc import check_interface
+from ..sql import Sql
+from ..mqtt import Mqtt
+from ..config import get_config
+from ..probe_request import ProbeRequest
+from ..config.cli_options import cli_options, cli_mqtt_options, cli_sql_options
+from ..wifi_channel import set_wifi_channel_from_args
+from ..wifi_channel.misc import can_use_interface
+from ..config.misc import IgnoreNoneChainMap
 
 logging.basicConfig(
     format=(
         '[%(threadName)-10s] %(name)-30s: '
-        '%(funcName)-20s: %(levelname)-8s : %(message)s'
+        '%(funcName)-30s: %(levelname)-8s : %(message)s'
     ),
 )
 logger = logging.getLogger(__name__)
@@ -28,57 +27,53 @@ Session = TypeVar('Session')
 
 @click.command()
 @cli_options
-@cli_channel_options
 @cli_mqtt_options
 @cli_sql_options
-def main(
-    interface: str, config: str, debug: bool, verbose: bool, **params: dict
-):
-    if debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-    elif verbose:
-        logging.getLogger().setLevel(logging.INFO)
-
+def main(interface: str,
+         config: str,
+         debug: bool,
+         verbose: bool,
+         **params: dict) -> None:
+    app = get_config(config=config, debug=debug, verbose=verbose, **params)
     logger.info(f"Using interface {interface}.")
-
-    app = get_config(config=config, debug=debug, **params)
-    check_interface(interface)
-    set_wifi_channel(interface, app)
-
+    can_use_interface(interface)
+    set_wifi_channel_from_args(interface, app)
     collect_probes(interface, app)
 
-def collect_probes(interface: str, app_cfg: ChainMap):
-    probes_queue = queue.Queue()
 
-    def add_probe_to_queue(packet):
-        probes_queue.put_nowait(packet)
+probes_queue = queue.Queue()
 
-    def packet_worker():
-        with Mqtt() as mqtt_client:
-            while True:
-                # Get a probe request packet out of the queue and process it
-                probe_time = time.perf_counter()
-                packet = probes_queue.get()
-                try:
-                    probe = ProbeRequest.from_packet(packet)
-                    logger.debug(probe)
-                    mqtt_client.publish_probe(probe)
-                    Sql.publish_probe(probe)
-                except BaseException:
-                    logger.debug(
-                        "Raw packet exception occured on: "
-                        f"{packet.original.hex()}"
-                    )
-                    logger.exception("Exception occured processing packet:")
-                finally:
-                    logger.debug(
-                        f"{threading.currentThread().getName()} "
-                        "processed probe request in "
-                        f"{time.perf_counter() - probe_time:.2f}s."
-                    )
-                    # Notify the queue that the probe has been processed.
-                    probes_queue.task_done()
+def add_probe_to_queue(packet):     # pragma: no cover
+    probes_queue.put_nowait(packet)
 
+
+def packet_worker():
+    with Mqtt() as mqtt_client:
+        while True:
+            # Get a probe request packet out of the queue and process it
+            probe_time = time.perf_counter()
+            packet = probes_queue.get()
+            try:
+                probe = ProbeRequest.from_packet(packet)
+                logger.debug(probe)
+                mqtt_client.publish_probe(probe)
+                Sql.publish_probe(probe)
+            except BaseException:
+                logger.exception(
+                    "Exception occured processing packet: "
+                    f'"{packet.original.hex()}"'
+                )
+            finally:
+                logger.debug(
+                    f"{threading.currentThread().getName()} "
+                    "processed probe request in "
+                    f"{time.perf_counter() - probe_time:.2f}s."
+                )
+                # Notify the queue that the probe has been processed.
+                probes_queue.task_done()
+
+
+def collect_probes(interface: str, app_cfg: IgnoreNoneChainMap):
     logger.debug(
         f"Spawning {app_cfg['worker_threads']} "
         f"daemon thread{'s' if app_cfg['worker_threads'] > 1 else ''} "
@@ -90,6 +85,7 @@ def collect_probes(interface: str, app_cfg: ChainMap):
 
     logger.info("Start collecting probe requests...")
     s = time.perf_counter()
+
     try:
         sniff(
             iface='mon0',

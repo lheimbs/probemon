@@ -150,3 +150,15 @@ class ProbeRequestUnitTest(TestCase):
             'rssi': probe.rssi,
             'raw': probe.raw,
         }))
+
+    def test_str_without_time(self):
+        probe = ProbeRequest(mac='112233445566')
+        probe.time = None
+        self.assertEqual(str(probe), json.dumps({
+            'time': None,
+            'mac': str(probe.mac),
+            'vendor': probe.vendor,
+            'ssid': probe.ssid,
+            'rssi': probe.rssi,
+            'raw': probe.raw,
+        }))

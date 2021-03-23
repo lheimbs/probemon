@@ -3,7 +3,6 @@ from probemon.probe_request.probe_request import ProbeRequest
 from probemon.mqtt.mqtt import Mqtt
 from unittest import TestCase, mock
 
-from click.testing import CliRunner
 import netaddr
 
 from .test_mqtt import reset_mqtt
@@ -14,7 +13,6 @@ from ..config.config_file import get_configfile_params
 from ..config.dot_env import get_dotenv_params
 from ..config.misc import convert_option_type, get_url, IgnoreNoneChainMap, set_mac_dialect
 from ..config import config
-from ..probes import main
 from ..mac import Mac
 from probemon.config import misc
 
@@ -40,16 +38,6 @@ def mock_exists_getter(falsies=None):
             return False
         return True
     return mock_exists
-
-
-@mock.patch('probemon.probes.check_interface')
-@mock.patch('probemon.probes.set_wifi_channel')
-@mock.patch('probemon.probes.collect_probes')
-class CliOptionsTest(TestCase):
-    def test_without_args(self, *args):
-        runner = CliRunner()
-        result = runner.invoke(main)
-        self.assertEqual(result.exit_code, 0)
 
 
 class ConvertOptionTypeUnitTest(TestCase):
@@ -191,26 +179,27 @@ class CliParamsUnitTest(TestCase):
 
 
 class ConfigFileUnitTest(TestCase):
-    @mock.patch('builtins.open', mock.mock_open(read_data=EMPTY_CONFIG))
-    def test_configfile_with_empty_config(self):
-        app, mqtt, sql, _ = get_configfile_params()
+    @mock.patch('probemon.config.config_file.configparser.ConfigParser.read', return_value=[])
+    def test_configfile_with_empty_config(self, read):
+        app, mqtt, sql = get_configfile_params()
         self.assertDictEqual(app, {})
         self.assertDictEqual(mqtt, {})
         self.assertDictEqual(sql, {})
 
     @mock.patch('builtins.open', mock.mock_open(read_data=APP_CONFIG))
     def test_configfile_app_empty_config(self):
-        app, mqtt, sql, _ = get_configfile_params()
-        self.assertDictEqual(app, {'key': 'value'})
+        app, mqtt, sql = get_configfile_params()
+        self.assertTrue('key' in app)
+        self.assertEqual(app['key'], 'value')
 
     @mock.patch('builtins.open', mock.mock_open(read_data=MQTT_CONFIG))
     def test_configfile_with_mqtt_config(self):
-        app, mqtt, sql, _ = get_configfile_params()
+        app, mqtt, sql = get_configfile_params()
         self.assertDictEqual(mqtt, {'key': 'value'})
 
     @mock.patch('builtins.open', mock.mock_open(read_data=SQL_CONFIG))
     def test_configfile_with_sql_config(self):
-        app, mqtt, sql, _ = get_configfile_params()
+        app, mqtt, sql = get_configfile_params()
         self.assertDictEqual(sql, {'key': 'value'})
 
 
@@ -359,10 +348,10 @@ class MqttFromParamsUnitTest(TestCase):
         )
         with self.assertLogs(config.logger, 'INFO') as logger:
             config.set_mqtt_from_params(map)
-        self.assertIn('INFO:probemon.config.config:    user      : user', logger.output)
-        self.assertIn('INFO:probemon.config.config:    host      : localhost', logger.output)
-        self.assertIn('INFO:probemon.config.config:    port      : 123', logger.output)
-        self.assertIn('INFO:probemon.config.config:    topic     : test', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    user      : user', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    host      : localhost', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    port      : 123', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    topic     : test', logger.output)
         for output in logger.output:
             self.assertNotIn('password', output)
 
@@ -377,7 +366,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         with self.assertLogs(config.logger, 'WARNING') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn(
-            'WARNING:probemon.config.config:Warning: with sql dialect unset, all other sql options will be ignored!',
+            f'WARNING:{config.logger.name}:Warning: with sql dialect unset, all other sql options will be ignored!',
             logger.output
         )
         self.assertIsNone(sql._engine)
@@ -387,7 +376,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         with self.assertLogs(config.logger, 'DEBUG') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn(
-            'DEBUG:probemon.config.config:No sql host with dialect other than sqlite supplied. Disabling sql.',
+            f'DEBUG:{config.logger.name}:No sql host with dialect other than sqlite supplied. Disabling sql.',
             logger.output
         )
         self.assertIsNone(sql._engine)
@@ -397,7 +386,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         with self.assertLogs(config.logger, 'WARNING') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn((
-            'WARNING:probemon.config.config:Warning: '
+            f'WARNING:{config.logger.name}:Warning: '
             'with sql dialect not sqlite and sql host unset, '
             'all sql options will be ignored and no data will get published to a sql database.'
         ), logger.output)
@@ -410,29 +399,26 @@ class SetSqlFromParamsUnitTest(TestCase):
         self.assertIsNotNone(sql._engine)
 
 
-@mock.patch('probemon.config.config.get_cli_params', return_value=({}, {}, {}))
-@mock.patch('probemon.config.config.get_dotenv_params', return_value=({}, {}, {}))
-@mock.patch('probemon.config.config.get_configfile_params', return_value=({}, {}, {}, []))
 class GetConfigOptionsUnitTest(TestCase):
+    @mock.patch('probemon.config.config.get_cli_params', return_value=({}, {}, {}))
+    @mock.patch('probemon.config.config.get_dotenv_params', return_value=({}, {}, {}))
+    @mock.patch('probemon.config.config.get_configfile_params', return_value=({}, {}, {}))
     def test_with_no_params(self, *args):
         app, mqtt, sql = config.get_config_options('')
         self.assertEqual(list(app), [])
         self.assertEqual(list(mqtt), [])
         self.assertEqual(list(sql), [])
 
+    @mock.patch('probemon.config.config.get_cli_params', return_value=({}, {}, {}))
+    @mock.patch('probemon.config.config.get_dotenv_params', return_value=({}, {}, {}))
+    @mock.patch('probemon.config.config_file.configparser.ConfigParser.read', return_value=[''])
     def test_with_config(self, ini, dotenv, cli):
-        ini.return_value = ({}, {}, {}, ['test'])
-        with self.assertLogs(config.logger, 'DEBUG') as logger:
-            config.get_config_options('')
-        self.assertIn('DEBUG:probemon.config.config:Using data from config files test', logger.output)
+        app, _, _ = config.get_config_options('')
+        self.assertEqual(app, IgnoreNoneChainMap({}, {}, {'parsed_files': ['']}))
 
 
 @mock.patch('probemon.config.config.get_config_options')
 class GetConfigUnitTest(TestCase):
-    def tearDown(self) -> None:
-        reset_probe()
-        logging.disable(logging.NOTSET)
-
     def test_sql_enabled(self, cfgs):
         cfgs.return_value = (
             IgnoreNoneChainMap(),
@@ -441,36 +427,19 @@ class GetConfigUnitTest(TestCase):
         )
         with self.assertLogs(config.logger, 'INFO') as logger, self.assertLogs(misc.logger, 'WARNING'):
             config.get_config('')
-        self.assertIn('INFO:probemon.config.config:    dialect   : sqlite', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    dialect   : sqlite', logger.output)
         for output in logger.output:
             self.assertNotIn('password', output)
 
-    def test_raw(self, cfgs):
+    def test_parsed_files(self, cfgs):
         cfgs.return_value = (
-            IgnoreNoneChainMap({'raw': True}),
+            IgnoreNoneChainMap({'parsed_files': ['test']}),
             IgnoreNoneChainMap(),
             IgnoreNoneChainMap()
         )
-        config.get_config('')
-        self.assertTrue(ProbeRequest.raw)
-
-    def test_lower(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap({'lower': True}),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap()
-        )
-        config.get_config('')
-        self.assertTrue(ProbeRequest.lower)
-
-    def test_get_vendor(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap({'vendor': True}),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap()
-        )
-        config.get_config('')
-        self.assertTrue(ProbeRequest.get_vendor)
+        with self.assertLogs(config.logger, 'DEBUG') as logger:
+            config.get_config('')
+        self.assertIn('DEBUG:probemon.config.config:Parsed config files: test', logger.output)
 
     def test_maclookup_api_key(self, cfgs):
         cfgs.return_value = (
@@ -481,11 +450,24 @@ class GetConfigUnitTest(TestCase):
         config.get_config('')
         self.assertEqual(ProbeRequest.maclookup_api_key, 'test')
 
-    def test_vendor_offline(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap({'vendor_offline': True}),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap()
-        )
-        config.get_config('')
+
+class SetProbeRequestFromParamsUnitTest(TestCase):
+    def setUp(self) -> None:
+        reset_probe()
+        return super().setUp()
+
+    def test_raw(self):
+        config.set_probe_request_from_params(IgnoreNoneChainMap({'raw': True}))
+        self.assertTrue(ProbeRequest.raw)
+
+    def test_lower(self):
+        config.set_probe_request_from_params(IgnoreNoneChainMap({'lower': True}))
+        self.assertTrue(ProbeRequest.lower)
+
+    def test_get_vendor(self):
+        config.set_probe_request_from_params(IgnoreNoneChainMap({'vendor': True}))
+        self.assertTrue(ProbeRequest.get_vendor)
+
+    def test_vendor_offline(self):
+        config.set_probe_request_from_params(IgnoreNoneChainMap({'vendor_offline': True}))
         self.assertTrue(ProbeRequest.vendor_offline)

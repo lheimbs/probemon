@@ -1,6 +1,8 @@
 import logging
 from unittest import TestCase, mock
 
+from ssl import SSLError
+
 from ..mqtt import Mqtt
 
 
@@ -54,6 +56,20 @@ class MqttUnitTest(TestCase):
     def test_init_without_any_configuraiton(self):
         mqtt = Mqtt()
         self.assertIsInstance(mqtt, Mqtt)
+
+    @mock.patch('probemon.mqtt.mqtt.mqtt_client.Client.tls_set')
+    def test_init_enabled_and_certs(self, tls_set):
+        Mqtt._enabled = True
+        Mqtt._ca_certs = 'test'
+        Mqtt()
+        tls_set.assert_called_once()
+
+    @mock.patch('probemon.mqtt.mqtt.mqtt_client.Client.enable_logger')
+    def test_init_enabled_debug(self, enable_logger):
+        Mqtt._enabled = True
+        Mqtt._debug = True
+        Mqtt()
+        enable_logger.assert_called_once()
 
     def test_is_enabled_without_configuration(self):
         self.assertFalse(Mqtt.is_enabled())
@@ -162,3 +178,15 @@ class MqttUnitTest(TestCase):
         mqtt = Mqtt()
         mqtt.publish_probe(None)
         self.assertIsNone(mqtt._client)
+
+    @mock.patch('probemon.mqtt.mqtt.mqtt_client.Client.connect', side_effect=ConnectionRefusedError)
+    def test_enter_with_connection_refused_error(self, _):
+        Mqtt.enable()
+        with Mqtt():
+            self.assertFalse(Mqtt.is_enabled())
+
+    @mock.patch('probemon.mqtt.mqtt.mqtt_client.Client.connect', side_effect=SSLError)
+    def test_enter_with_ssl_error(self, _):
+        Mqtt.enable()
+        with Mqtt():
+            self.assertFalse(Mqtt.is_enabled())

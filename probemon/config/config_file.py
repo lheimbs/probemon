@@ -11,7 +11,7 @@ def get_configfile_params(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
     )
     config = configparser.ConfigParser()
-    ret_val = config.read([
+    parsed_files = config.read([
         config_path if config_path is not None else "",
         os.path.join(basedir, 'config.ini'),
         os.path.join(
@@ -20,6 +20,8 @@ def get_configfile_params(
     ])
 
     app = dict(config.items('APP')) if 'APP' in config else {}
+    if parsed_files:
+        app.update({'parsed_files': parsed_files})
     mqtt = dict(config.items('MQTT')) if 'MQTT' in config else {}
     sql = dict(config.items('SQL')) if 'SQL' in config else {}
 
@@ -30,4 +32,4 @@ def get_configfile_params(
     for key, value in sql.items():
         sql[key] = convert_option_type(value)
 
-    return app, mqtt, sql, ret_val
+    return app, mqtt, sql

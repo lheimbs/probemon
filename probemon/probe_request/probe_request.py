@@ -130,7 +130,7 @@ class ProbeRequest:
         }
 
 
-class ProbeRequestModel(Base):
+class ProbeRequestModel(Base):          # pragma: no cover
     __tablename__ = "probe_requests"
 
     id = Column(Integer, Sequence('probe_request_id_seq'), primary_key=True)

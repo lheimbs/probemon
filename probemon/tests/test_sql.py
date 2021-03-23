@@ -1,4 +1,5 @@
 import logging
+import importlib
 from datetime import datetime
 from unittest import TestCase, mock
 
@@ -45,9 +46,14 @@ class SqlUnitTest(TestCase):
 
     def test_set_url_postgres(self):
         sql = Sql()
+        psql_driver = importlib.util.find_spec('psycopg2') is not None
         sql.set_url('postgresql://')
-        self.assertIsInstance(sql._engine, sqlalchemy.engine.Engine)
-        self.assertTrue(Sql.is_enabled())
+        if psql_driver:
+            self.assertIsInstance(sql._engine, sqlalchemy.engine.Engine)
+            self.assertTrue(Sql.is_enabled())
+        else:
+            self.assertIsNone(sql._engine)
+            self.assertFalse(Sql.is_enabled())
 
     def test_set_url_with_bad_dialect(self):
         sql = Sql()
@@ -86,6 +92,12 @@ class SqlWithDatabaseInMemoryUnitTest(TestCase):
         probe_model = Sql.publish_probe(probe)
         self.assertIsInstance(probe_model, ProbeRequestModel)
 
+    @mock.patch('probemon.probe_request.probe_request.ProbeRequestModel', side_effect=AttributeError)
+    def test_publish_probe_with_bad_model(self, _):
+        probe = ProbeRequest(mac='aa:bb:cc:dd:ee:ff')
+        probe_model = Sql.publish_probe(probe)
+        self.assertIsNone(probe_model)
+
     def test_publish_probe_with_sql_disabled(self):
         Sql.disable()
         probe = ProbeRequest(datetime.now(), 'aa:bb:cc:dd:ee:ff')
@@ -122,6 +134,11 @@ class SqlWithDatabaseInMemoryUnitTest(TestCase):
             Sql.publish_probe(ProbeRequest(datetime.now(), mac))
         vendor = Sql.get_vendor(mac)
         self.assertEqual(vendor, 'test')
+
+    def test_get_vendor_with_no_vendors(self):
+        mac = 'aa:bb:cc:dd:ee:f2'
+        vendor = Sql.get_vendor(mac)
+        self.assertEqual(vendor, '')
 
     def test_get_vendor_with_exception_at_query(self):
         logging.disable(logging.ERROR)

@@ -56,6 +56,22 @@ def cli_options(main: Callable) -> Callable:
         help="Maclookup API key to use with macaddress.io api."
     )(main)
     click.option(
+        '--channel',
+        help=(
+            "Pass an argument string for the module 'wifi_channel'. "
+            "This will set the wifi adapters channel for collection. "
+            "It can also be run directly by calling the module "
+            "'wifi_channel'. Allowed arguments: ['set', 'scan', "
+            "'hop', 'auto', 'search', 'hop_async_no_sniff', '--all', "
+            "'--2ghz', '--5ghz', '--all-channels', '--popular', "
+            "'--populated', '--time', '--random']. "
+            "To specify the ssid for 'search', prefix the ssid with <SSID:> "
+            "(without brackets). "
+            "To get help on the arguments pass '--help' (ie: 'set --help')."
+            "The Interface gets passed through!"
+        ),
+    )(main)
+    click.option(
         '--debug/--no-debug', default=False,
         help='Enable debugging output.',
     )(main)
@@ -73,7 +89,7 @@ def cli_options(main: Callable) -> Callable:
     return main
 
 
-def cli_channel_options(main: Callable) -> Callable:
+def cli_channel_options(main: Callable) -> Callable:        # pragma: no cover
     # CHANNEL OPTIONS
     channel_group = MutuallyExclusiveOptionGroup(
         'Channel configuration',
@@ -216,15 +232,15 @@ def cli_sql_options(main: Callable) -> Callable:
     return main
 
 
-def cli_files_options(main: Callable) -> Callable:
-    # file_group = OptionGroup(
-    #     'JSON configuration',
-    #     help="Configuraiton for writing recorded probes to a json file."
-    # )
-    # main = file_group.option(
-    #     '--json-file',
-    #     type=click.Path(writable=True),
-    #     help='JSON file path. Can be either to a directory or a file.'
-    # )(main)
-    # main = file_group.option('--json-max-filesize')(main)
-    return main
+# def cli_files_options(main: Callable) -> Callable:
+#     file_group = OptionGroup(
+#         'JSON configuration',
+#         help="Configuraiton for writing recorded probes to a json file."
+#     )
+#     main = file_group.option(
+#         '--json-file',
+#         type=click.Path(writable=True),
+#         help='JSON file path. Can be either to a directory or a file.'
+#     )(main)
+#     main = file_group.option('--json-max-filesize')(main)
+#     return main

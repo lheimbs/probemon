@@ -1,6 +1,7 @@
 import re
 import logging
 from unittest import TestCase, mock
+from json.decoder import JSONDecodeError
 
 import responses
 import requests
@@ -72,7 +73,7 @@ class MaclookupUnitTest(TestCase):
     def test_without_api_key(self):
         with self.assertLogs(vendor.logger, 'DEBUG') as log:
             vendor.get_maclookup_vendor(self.mac_with_valid_oui.oui, '')
-        self.assertIn('DEBUG:probemon.mac_vendor.vendor:No api key for maclookup supplied.', log.output)
+        self.assertIn(f'DEBUG:{vendor.logger.name}:No api key for maclookup supplied.', log.output)
 
     @mock.patch('maclookup.requester.urlopen')
     def test_with_api_key(self, url_open):
@@ -94,7 +95,7 @@ class MaclookupUnitTest(TestCase):
             res = vendor.get_maclookup_vendor(self.mac_with_valid_oui.oui, 'key')
         self.assertEqual(res, '')
         self.assertIn(
-            'WARNING:probemon.mac_vendor.vendor:Given api key for maclookup is invalid.',
+            f'WARNING:{vendor.logger.name}:Given api key for maclookup is invalid.',
             log.output
         )
 
@@ -107,7 +108,7 @@ class MaclookupUnitTest(TestCase):
             res = vendor.get_maclookup_vendor(self.mac_with_valid_oui.oui, 'PROBEMON_MACLOOKUP_API_KEY')
         self.assertEqual(res, '')
         self.assertIn(
-            'INFO:probemon.mac_vendor.vendor:Maclookups free 1000 daily requests limit reached.',
+            f'INFO:{vendor.logger.name}:Maclookups free 1000 daily requests limit reached.',
             log.output
         )
 
@@ -150,7 +151,20 @@ class MacvendorlookupComUnitTest(TestCase):
         responses.add(responses.GET, url=self.url, status=500)
         with self.assertLogs(vendor.logger, 'DEBUG') as log:
             vendor.get_macvendorlookup_com_vendor(self.mac_with_valid_oui.oui)
-        self.assertIn('DEBUG:probemon.mac_vendor.vendor:Error getting vendor from macvendorlookup.com.', log.output)
+        self.assertIn(f'DEBUG:{vendor.logger.name}:Error getting vendor from macvendorlookup.com.', log.output)
+
+    def test_error_exception_on_bad_json(self):
+        def response_callback(resp):
+            def json_resp():
+                raise JSONDecodeError('s', 'd', 1)
+            resp.status = 200
+            resp.json = json_resp
+            return resp
+        with self.assertLogs(vendor.logger, 'ERROR') as log, \
+                responses.RequestsMock(response_callback=response_callback) as m:
+            m.add(responses.GET, url=self.url)
+            vendor.get_macvendorlookup_com_vendor(self.mac_with_valid_oui.oui)
+        self.assertIn("Could not json decode macvendorlookup response.", log.output[-1])
 
 
 class MacvendorsCoUnitTest(TestCase):
@@ -191,7 +205,20 @@ class MacvendorsCoUnitTest(TestCase):
         responses.add(responses.GET, url=self.url, status=500)
         with self.assertLogs(vendor.logger, 'DEBUG') as log:
             vendor.get_macvendors_co_vendor(self.mac_with_valid_oui.oui)
-        self.assertIn('DEBUG:probemon.mac_vendor.vendor:Error getting vendor from macvendors.co.', log.output)
+        self.assertIn(f'DEBUG:{vendor.logger.name}:Error getting vendor from macvendors.co.', log.output)
+
+    def test_error_exception_on_bad_json(self):
+        def response_callback(resp):
+            def json_resp():
+                raise JSONDecodeError('s', 'd', 1)
+            resp.status = 200
+            resp.json = json_resp
+            return resp
+        with self.assertLogs(vendor.logger, 'ERROR') as log, \
+                responses.RequestsMock(response_callback=response_callback) as m:
+            m.add(responses.GET, url=self.url)
+            vendor.get_macvendors_co_vendor(self.mac_with_valid_oui.oui)
+        self.assertIn("Could not json decode macvendors.co response.", log.output[-1])
 
 
 class MacvendorsComUnitTest(TestCase):
@@ -232,4 +259,4 @@ class MacvendorsComUnitTest(TestCase):
         responses.add(responses.GET, url=self.url, status=500)
         with self.assertLogs(vendor.logger, 'DEBUG') as log:
             vendor.get_macvendors_com_vendor(self.mac_with_valid_oui.oui)
-        self.assertIn('DEBUG:probemon.mac_vendor.vendor:Error getting vendor from api.macvendors.com.', log.output)
+        self.assertIn(f'DEBUG:{vendor.logger.name}:Error getting vendor from api.macvendors.com.', log.output)
