@@ -1,19 +1,25 @@
 ; sections are case sensitive, keys are not
 [APP]
-; bool
+; bool:
 LOWER = 
-; bool
+; bool:
 RAW = 
-; bool
+; bool:
 VENDOR = 
-; bool
+; bool:
 VENDOR_OFFLINE = 
-; bool
-CHANNEL_AUTO = 
-; int
-CHANNEL_SET = 
-; str
-CHANNEL_SSID_SELECT = 
+; Argument string for the module 'wifi_channel'.
+; This will set the wifi adapters channel for collection.
+; It can also be run directly by calling the module 'wifi_channel'.
+; Allowed arguments:
+;    'set', 'scan', 'hop', 'auto', 'search', 'hop_async_no_sniff', '--all',
+;     '--2ghz', '--5ghz', '--all-channels', '--popular',
+;     '--populated', '--time', '--random'
+; To specify the ssid for 'search', prefix the ssid with <SSID:>
+; (without brackets).
+; To get help on the arguments pass '--help' (ie: 'set --help').
+; The Interface gets passed through!
+CHANNEL = 
 ; 1..N worker threads
 WORKER_THREADS = 
 ; 0..N probe request count

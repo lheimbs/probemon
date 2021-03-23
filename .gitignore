@@ -8,3 +8,5 @@ testvenv/
 .env
 config.ini
 *.db
+htmlcov/
+.coverage

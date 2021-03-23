@@ -22,9 +22,8 @@ Optionally set the wifi channel through several different methods:
   - Manual: Set the used channel manually to a channel of your choice.
   - Auto: Iterate through available channels and automatically select the channel the most APs are using.
   - Hop: Randomly or sequentially hop all available channel with a supplied hop time while collecting probes.
-    WARNING: Currently this option can only be set through cli options.
   - SSID: Scan all channels for the supplied ssid of a wifi network and set the channel accordingly.
-    If the ssid isn't found in 30 seconds, default to most used channel (see Auto).
+    If the ssid isn't found, default to most used channel (see Auto).
 
 ### Raw probe request saving
 If additional processing of the probes in the future is required, it is possible to save a hexdump of the probe request.
@@ -68,6 +67,19 @@ Options:
                                   given but no debugging.
 
   --debug / --no-debug            Enable debugging output.
+  --channel TEXT                  Pass an argument string for the module
+                                  'wifi_channel'. This will set the wifi
+                                  adapters channel for collection. It can also
+                                  be run directly by calling the module
+                                  'wifi_channel'. Allowed arguments: ['set',
+                                  'scan', 'hop', 'auto', 'search',
+                                  'hop_async_no_sniff', '--all', '--2ghz', '--
+                                  5ghz', '--all-channels', '--popular', '--
+                                  populated', '--time', '--random']. To
+                                  specify the ssid for 'search', prefix the
+                                  ssid with <SSID:> (without brackets).
+                                  Interface is passed through!
+
   --maclookup-api-key TEXT        Maclookup API key to use with macaddress.io
                                   api.
 
@@ -93,24 +105,6 @@ Options:
                                   lowercase.
 
   -c, --config PATH               Provide a config file.
-  Channel configuration: [mutually_exclusive]
-                                  Set the wifi adapters channel for
-                                  collection. This can also be run directly by
-                                  calling the module 'wifi_channel'.
-
-    --channel-ssid-select TEXT    Scan for supplied ssid and set channel
-                                  accordingly.
-
-    --channel-hop <FLOAT BOOLEAN>...
-                                  Continously hop between channels while
-                                  collecting probes. FLOAT: <hop interval>,
-                                  BOOL: <True for random hopping, False for
-                                  sequential>.
-
-    --channel-auto                Automatically set wifi channel to the most
-                                  used channel in the vicinity.
-
-    --channel-set INTEGER         Manually set wifi channel.
   Mqtt configuration:             Configuration for publishing recorded probes
                                   to a mqtt network. For more details see
                                   https://pypi.org/project/paho-mqtt/.
@@ -204,3 +198,4 @@ WantedBy=multi-user.target
 - [ ] clean up configuraiton (maybe replace/add with [simple-settings](https://github.com/drgarcia1986/simple-settings)?)
 - [ ] use [rich](https://github.com/willmcgugan/rich) for console output?
 - [ ] access channel tool from main
+- [ ] Add [PyRIC](https://pypi.org/project/PyRIC/) dependency to before falling back to iw (Problem: PyRICs PyPi abandoned, only maintained [here](https://github.com/wifiphisher/WiPy))?
