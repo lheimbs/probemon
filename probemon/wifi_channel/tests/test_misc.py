@@ -1,6 +1,6 @@
 from unittest import TestCase, mock
 
-from .test_channel_scanner import BEACON, PACKET, PROBE, PACKET_2
+from .test_channel_scanner import BEACON, PROBE, PACKET_2
 from ..misc import AccessPoint, can_use_interface, can_use_iw
 
 class AccessPointUnitTest(TestCase):

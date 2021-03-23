@@ -1,13 +1,20 @@
 ; sections are case sensitive, keys are not
 [APP]
-; bool:
+; bools:
+DEBUG = 
+VERBOSE = 
 LOWER = 
-; bool:
 RAW = 
-; bool:
 VENDOR = 
-; bool:
 VENDOR_OFFLINE = 
+; 1..N worker threads
+WORKER_THREADS = 
+; 0..N probe request count
+COUNT = 
+; str
+MACLOOKUP_API_KEY = 
+; one out of: [bare, cisco, eui48, pgsql, unix, unix_expanded]
+MAC_FORMAT =
 ; Argument string for the module 'wifi_channel'.
 ; This will set the wifi adapters channel for collection.
 ; It can also be run directly by calling the module 'wifi_channel'.
@@ -19,35 +26,46 @@ VENDOR_OFFLINE =
 ; (without brackets).
 ; To get help on the arguments pass '--help' (ie: 'set --help').
 ; The Interface gets passed through!
-CHANNEL = 
-; 1..N worker threads
-WORKER_THREADS = 
-; 0..N probe request count
-COUNT = 
-; str
-MACLOOKUP_API_KEY = 
-; one out of: [bare, cisco, eui48, pgsql, unix, unix_expanded]
-MAC_FORMAT = 
+CHANNEL =  
 
 [MQTT]
+; str
 HOST = localhost
+; int
 PORT = 1883
+; str
 USER = test
+; str
 PASSWORD = testpassword
+; filepath
 CA_CERTS = 
+; filepath
 CERTFILE = 
+; filepath
 KEYFILE = 
+; str
 TOPIC = probe_request
+; bool
 DEBUG = 
 
 [SQL]
+; str
 DIALECT = sqlite
+; filepath
 SQLITE_PATH = /tmp/probes.db
+; str
 HOST = 
+; int
 PORT = 
+; str
 USER = 
+; str
 PASSWORD = 
+; str
 DATABASE = 
+; str
 DRIVER = 
+; keywords: KEY=VALUE,KEY=VALUE
 KWARGS = 
+; bool
 DROP_ALL = 
