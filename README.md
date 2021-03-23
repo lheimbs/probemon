@@ -200,4 +200,5 @@ WantedBy=multi-user.target
 - [ ] access channel tool from main
 - [ ] Add [PyRIC](https://pypi.org/project/PyRIC/) dependency to before falling back to iw (Problem: PyRICs PyPi abandoned, only maintained [here](https://github.com/wifiphisher/WiPy))?
 - [ ] Allow for multiple interfaces/nics to cover multiple channels
+- [ ] Add description of wifi_scanner and revamp its command help
 
