@@ -111,7 +111,7 @@ class ProbeRequest:
         )
 
     def __str__(self):
-        self_dict = self.__dict__()
+        self_dict = dict(self)
         self_dict['mac'] = str(self_dict['mac'])
         if self_dict['time']:
             self_dict['time'] = self_dict['time'].isoformat()
@@ -119,15 +119,13 @@ class ProbeRequest:
             self_dict['time'] = None
         return json.dumps(self_dict)
 
-    def __dict__(self):
-        return {
-            'time': self.time,
-            'mac': self.mac,
-            'vendor': self.vendor,
-            'ssid': self.ssid,
-            'rssi': self.rssi,
-            'raw': self.raw,
-        }
+    def __iter__(self):
+        yield 'time', self.time
+        yield 'mac', self.mac
+        yield 'vendor', self.vendor
+        yield 'ssid', self.ssid
+        yield 'rssi', self.rssi
+        yield 'raw', self.raw
 
 
 class ProbeRequestModel(Base):          # pragma: no cover

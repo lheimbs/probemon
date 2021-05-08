@@ -35,7 +35,7 @@ class AccessPoint:
             ])
         return False
 
-    def __str__(self):
+    def __repr__(self):
         return (
             f'<AccessPoint(bssid="{self.bssid}", '
             f'channel={self.channel}, '
