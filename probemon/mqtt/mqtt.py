@@ -14,7 +14,7 @@ class Mqtt(object):
     _user = None
     _password = None
     _topic = None
-    _ca_certs = _certfile = _keyfile = None
+    _ca_certs, _certfile, _keyfile = None, None, None
     _debug = False
 
     def __init__(self) -> None:
@@ -86,18 +86,18 @@ class Mqtt(object):
             logger.warning("A mqtt topic is required. Disabling mqtt!")
             Mqtt.disable()
 
-    def set_tls(ca_certs: str, certfile: str, keyfile: str) -> None:
+    def set_tls(mqtt_ca_certs: str, mqtt_certfile: str, mqtt_keyfile: str) -> None:
         if Mqtt.is_enabled():
             logger.debug(
                 "Setting tls encryption with "
-                f"ca_certs file {ca_certs}, "
-                f"certfile {certfile} and keyfile {keyfile}."
+                f"ca_certs file {mqtt_ca_certs}, "
+                f"certfile {mqtt_certfile} and keyfile {mqtt_keyfile}."
             )
-            if ca_certs:
-                Mqtt._ca_certs = ca_certs
-            if certfile and keyfile:
-                Mqtt._certfile = certfile
-                Mqtt._keyfile = keyfile
+            if mqtt_ca_certs:
+                Mqtt._ca_certs = mqtt_ca_certs
+            if mqtt_certfile and mqtt_keyfile:
+                Mqtt._certfile = mqtt_certfile
+                Mqtt._keyfile = mqtt_keyfile
 
     def enable_debugging() -> None:
         logger.debug("Enabling mqtt client debugging.")
