@@ -69,3 +69,8 @@ DRIVER =
 KWARGS = 
 ; bool
 DROP_ALL = 
+
+[URLPUBLISH]
+URL = 
+TOKEN = 
+ONLY_MAC_AND_TIME = 
