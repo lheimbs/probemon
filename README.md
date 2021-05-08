@@ -77,8 +77,10 @@ Options:
                                   5ghz', '--all-channels', '--popular', '--
                                   populated', '--time', '--random']. To
                                   specify the ssid for 'search', prefix the
-                                  ssid with <SSID:> (without brackets).
-                                  Interface is passed through!
+                                  ssid with <SSID:> (without brackets). To get
+                                  help on the arguments pass '--help' (ie:
+                                  'set --help').The Interface gets passed
+                                  through!
 
   --maclookup-api-key TEXT        Maclookup API key to use with macaddress.io
                                   api.
@@ -150,6 +152,15 @@ Options:
 
     --sql-dialect [postgresql|mysql|oracle|mssql|sqlite]
                                   Sql host name
+  Publish to webserver configuration: 
+                                  Configuration for publishing recieved Probes
+                                  to a Webserver.
+
+    --url-publish-only-mac-and-time
+    --url-publish-token TEXT      Token to authenticate probemon with against
+                                  the server.
+
+    --url-publish-url TEXT        Url to post the revieved probes to.
   --help                          Show this message and exit.
 ```
 
