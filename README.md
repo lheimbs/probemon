@@ -206,10 +206,12 @@ WantedBy=multi-user.target
 ```
 
 ## TODOs
-- [ ] clean up configuraiton (maybe replace/add with [simple-settings](https://github.com/drgarcia1986/simple-settings)?)
+- [x] clean up configuraiton (maybe replace/add with [simple-settings](https://github.com/drgarcia1986/simple-settings)?)
 - [ ] use [rich](https://github.com/willmcgugan/rich) for console output?
-- [ ] access channel tool from main
+- [x] access channel tool from main
 - [ ] Add [PyRIC](https://pypi.org/project/PyRIC/) dependency to before falling back to iw (Problem: PyRICs PyPi abandoned, only maintained [here](https://github.com/wifiphisher/WiPy))?
 - [ ] Allow for multiple interfaces/nics to cover multiple channels
 - [ ] Add description of wifi_scanner and revamp its command help
+- [ ] Add option to encrypt published probe for mqtt/url publisher
+- [ ] Investigate probemon crashing silently after a few days
 
