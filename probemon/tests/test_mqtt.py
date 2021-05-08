@@ -3,7 +3,7 @@ from unittest import TestCase, mock
 
 from ssl import SSLError
 
-from ..mqtt import Mqtt
+from ..mqtt import Mqtt, MqttDaemon
 
 
 def reset_mqtt():
@@ -190,3 +190,31 @@ class MqttUnitTest(TestCase):
         Mqtt.enable()
         with Mqtt():
             self.assertFalse(Mqtt.is_enabled())
+
+
+class MqttDaemonUnitTest(TestCase):
+    def test_add_probe_not_running(self):
+        MqttDaemon.running = False
+        MqttDaemon.add(None)
+        self.assertTrue(MqttDaemon.queue.empty())
+
+    def test_add_probe_running(self):
+        MqttDaemon.running = True
+        MqttDaemon.add(None)
+        self.assertIsNone(MqttDaemon.queue.get())
+
+    def test_daemon_run_with_mqtt_not_enabled(self):
+        MqttDaemon.running = False
+        with mock.patch('probemon.mqtt.mqtt.Mqtt.is_enabled', return_value=False):
+            daemon = MqttDaemon()
+            daemon.run()
+        self.assertFalse(MqttDaemon.running)
+
+    @mock.patch('probemon.mqtt.mqtt_daemon.MqttDaemon.queue')
+    @mock.patch('probemon.mqtt.mqtt_daemon.Mqtt', **{'is_enabled.side_effect': [True, True, False, False]})
+    def test_daemon_run_with_mqtt_enabled(self, mqtt_cls, queue):
+        MqttDaemon.running = False
+        daemon = MqttDaemon()
+        daemon.run()
+        self.assertFalse(MqttDaemon.running)
+        self.assertEqual(len(queue.method_calls), 4)

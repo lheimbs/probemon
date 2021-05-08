@@ -6,7 +6,7 @@ from unittest import TestCase, mock
 import sqlalchemy
 # from sqlalchemy.orm import session
 
-from ..sql import Sql
+from ..sql import Sql, SqlDaemon
 from ..probe_request import ProbeRequest, ProbeRequestModel
 
 class SqlUnitTest(TestCase):
@@ -145,3 +145,31 @@ class SqlWithDatabaseInMemoryUnitTest(TestCase):
         with mock.patch.object(Sql, '_Session') as mocked_session:
             mocked_session.return_value.query.side_effect = TypeError()
             self.assertRaises(TypeError, Sql.get_vendor, '112233445566')
+
+
+class SqlDaemonUnitTest(TestCase):
+    def test_add_probe_not_running(self):
+        SqlDaemon.running = False
+        SqlDaemon.add(None)
+        self.assertTrue(SqlDaemon.queue.empty())
+
+    def test_add_probe_running(self):
+        SqlDaemon.running = True
+        SqlDaemon.add(None)
+        self.assertIsNone(SqlDaemon.queue.get())
+
+    def test_daemon_run_with_mqtt_not_enabled(self):
+        SqlDaemon.running = False
+        with mock.patch('probemon.sql.sql.Sql.is_enabled', return_value=False):
+            daemon = SqlDaemon()
+            daemon.run()
+        self.assertFalse(SqlDaemon.running)
+
+    @mock.patch('probemon.sql.sql_daemon.SqlDaemon.queue')
+    @mock.patch('probemon.sql.sql_daemon.Sql', **{'is_enabled.side_effect': [True, True, False, False]})
+    def test_daemon_run_with_mqtt_enabled(self, mqtt_cls, queue):
+        SqlDaemon.running = False
+        daemon = SqlDaemon()
+        daemon.run()
+        self.assertFalse(SqlDaemon.running)
+        self.assertEqual(len(queue.method_calls), 4)

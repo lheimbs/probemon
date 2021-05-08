@@ -4,7 +4,7 @@ from unittest import TestCase, mock
 from click.testing import CliRunner
 
 from ..probes import probes
-from ..config.misc import IgnoreNoneChainMap
+from ..config.misc import MissingChainMap
 
 BASIC_CONFIG = """"""
 DEBUG_CONFIG = """[APP]\nDEBUG=True"""
@@ -68,10 +68,10 @@ class ProbesMainTest(TestCase):
 
 @mock.patch('threading.Thread.start')
 @mock.patch('probemon.probes.probes.sniff')
-@mock.patch.object(probes.probes_queue, 'join')
+@mock.patch.object(probes.packet_queue, 'join')
 class CollectProbesTest(TestCase):
     def setUp(self) -> None:
-        self.args = IgnoreNoneChainMap({
+        self.args = MissingChainMap({
             'worker_threads': 3,
         })
         return super().setUp()
@@ -79,14 +79,14 @@ class CollectProbesTest(TestCase):
     def test_worker_with_no_threads(self, _, __, start):
         self.args['worker_threads'] = 0
         probes.collect_probes('test', self.args)
-        start.assert_not_called()
+        start.assert_called_with()
 
     def test_worker_threads_initing(self, _, __, start):
         probes.collect_probes('test', self.args)
-        self.assertEqual(start.call_count, 3)
+        self.assertEqual(start.call_count, 3+3)
 
-    @mock.patch.object(probes.probes_queue, 'qsize', return_value=0)
-    @mock.patch.object(probes.probes_queue, 'join', return_value=0)
+    @mock.patch.object(probes.packet_queue, 'qsize', return_value=0)
+    @mock.patch.object(probes.packet_queue, 'join', return_value=0)
     @mock.patch('probemon.probes.probes.threading.active_count', return_value=1)
     @mock.patch('probemon.probes.probes.time.perf_counter', return_value=0)
     def test_no_remaining_probes(self, *args):
@@ -103,10 +103,10 @@ class CollectProbesTest(TestCase):
         'probemon.probes.probes.ProbeRequest.from_packet',
         return_value='example probe request'
     )
-    @mock.patch.object(probes.probes_queue, 'qsize', return_value=1)
-    @mock.patch.object(probes.probes_queue, 'get')
-    @mock.patch.object(probes.probes_queue, 'task_done')
-    @mock.patch.object(probes.probes_queue, 'empty', side_effect=(False, True))
+    @mock.patch.object(probes.packet_queue, 'qsize', return_value=1)
+    @mock.patch.object(probes.packet_queue, 'get')
+    @mock.patch.object(probes.packet_queue, 'task_done')
+    @mock.patch.object(probes.packet_queue, 'empty', side_effect=(False, True))
     def test_remaining_probes_without_workers(self, queue, *args):
         with self.assertLogs(probes.logger, 'INFO') as logger:
             probes.collect_probes('test', self.args)
@@ -125,21 +125,31 @@ class CollectProbesTest(TestCase):
 
 class AddProbeToQueueTest(TestCase):
     def test_call_add_probe(self):
-        probes.add_probe_to_queue(None)
-        self.assertIsNone(probes.probes_queue.get())
+        probes.add_packet_to_queue(None)
+        self.assertIsNone(probes.packet_queue.get())
 
 
-@mock.patch.object(probes.probes_queue, 'join')
-@mock.patch('probemon.probes.probes.ProbeRequest.from_packet', return_value=None)
-@mock.patch('probemon.probes.probes.Sql.publish_probe', side_effect=TypeError)
-@mock.patch('probemon.probes.probes.time.perf_counter', side_effect=[0, 0, TypeError])
+@mock.patch('time.perf_counter', side_effect=[None, TypeError])
 class PacketWorkerTest(TestCase):
-    def test_call_packet_worker(self, *args):
+    def test_call_packet_worker(self, _):
         logging.disable(logging.CRITICAL)
         mock_packet = mock.Mock()
-        probes.probes_queue.put(mock_packet)
-        probes.probes_queue.put(mock_packet)
-        self.assertEqual(probes.probes_queue.qsize(), 2)
-        with self.assertRaises(TypeError):
+        probes.packet_queue.put(mock_packet)
+        probes.packet_queue.put(mock_packet)
+        self.assertEqual(probes.packet_queue.qsize(), 2)
+        packet_patch = {
+            'target': 'probemon.probes.probes.ProbeRequest.from_packet',
+            'side_effect': [None, None]
+        }
+        with self.assertRaises(TypeError), mock.patch(**packet_patch):
             probes.packet_worker()
-        self.assertEqual(probes.probes_queue.qsize(), 1)
+        self.assertEqual(probes.packet_queue.qsize(), 1)
+
+    # @mock.patch('probemon.probes.probes.MqttDaemon', side_effect=InterruptedError)
+    def test_packet_worker_with_exception_thrown(self, *args):
+        logging.disable(logging.NOTSET)
+        probes.packet_queue.put({})
+        with self.assertRaises(TypeError), self.assertLogs(probes.logger, 'ERROR') as logger:
+            probes.packet_worker()
+            self.assertEqual(len(logger.output), 1)
+            self.assertIn(f'ERROR:{probes.logger.name}:Exception occured processing packet', logger.output[0])

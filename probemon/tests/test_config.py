@@ -11,7 +11,7 @@ from .test_probe_request import reset_probe
 from ..config.cli import get_cli_params
 from ..config.config_file import get_configfile_params
 from ..config.dot_env import get_dotenv_params
-from ..config.misc import convert_option_type, get_url, IgnoreNoneChainMap, set_mac_dialect
+from ..config.misc import convert_option_type, get_url, MissingChainMap, set_mac_dialect
 from ..config import config
 from ..mac import Mac
 from probemon.config import misc
@@ -27,6 +27,10 @@ key = value
 """
 SQL_CONFIG = """
 [SQL]
+key = value
+"""
+URL_CONFIG = """
+[URLPUBLISH]
 key = value
 """
 
@@ -74,7 +78,7 @@ class GetUrlUnitTest(TestCase):
 
     def test_sqlite_dialect_with_path(self):
         logging.disable(logging.WARNING)
-        url = get_url('sqlite', sqlite_path='test')
+        url = get_url('sqlite', sql_sqlite_path='test')
         self.assertEqual(url, "sqlite:///test")
 
     def test_dialect_bare(self):
@@ -84,22 +88,22 @@ class GetUrlUnitTest(TestCase):
 
     def test_dialect_with_port(self):
         logging.disable(logging.WARNING)
-        url = get_url('mysql', port=12345)
+        url = get_url('mysql', sql_port=12345)
         self.assertEqual(url, "mysql://@:12345/")
 
     def test_dialect_with_driver(self):
         logging.disable(logging.WARNING)
-        url = get_url('mysql', driver='test')
+        url = get_url('mysql', sql_driver='test')
         self.assertEqual(url, "mysql+test://@/")
 
     def test_dialect_with_password(self):
         logging.disable(logging.WARNING)
-        url = get_url('mysql', password='test')
+        url = get_url('mysql', sql_password='test')
         self.assertEqual(url, "mysql://:test@/")
 
     def test_dialect_with_kwarg(self):
         logging.disable(logging.WARNING)
-        url = get_url('mysql', kwargs="test")
+        url = get_url('mysql', sql_kwargs="test")
         self.assertEqual(url, "mysql://@/?test")
 
     def test_dialect_with_unknown_kwarg(self):
@@ -108,30 +112,30 @@ class GetUrlUnitTest(TestCase):
         self.assertEqual(url, "mysql://@/")
 
 
-class IgnoreNoneChainMapUnitTest(TestCase):
+class MissingChainMapUnitTest(TestCase):
     def test_missing(self):
-        map = IgnoreNoneChainMap()
+        map = MissingChainMap()
         self.assertIsNone(map['test'])
 
-    def test_getitem_with_item_in_map_and_not_none(self):
-        map = IgnoreNoneChainMap({'placeholder': None}, {'test': 'test'})
-        self.assertEqual(map['test'], 'test')
+    # def test_getitem_with_item_in_map_and_not_none(self):
+    #     map = MissingChainMap({'placeholder': None}, {'test': 'test'})
+    #     self.assertEqual(map['test'], 'test')
 
-    def test_getitem_with_item_in_map_but_none(self):
-        map = IgnoreNoneChainMap({'placeholder': None}, {'test': None})
-        self.assertIsNone(map['test'])
+    # def test_getitem_with_item_in_map_but_none(self):
+    #     map = MissingChainMap({'placeholder': None}, {'test': None})
+    #     self.assertIsNone(map['test'])
 
-    def test_getall_with_item_not_in_map(self):
-        map = IgnoreNoneChainMap({'placeholder': None}, {'test1': 'test'})
-        self.assertEqual(map.get_all('test'), [])
+    # def test_getall_with_item_not_in_map(self):
+    #     map = MissingChainMap({'placeholder': None}, {'test1': 'test'})
+    #     self.assertEqual(map.get_all('test'), [])
 
-    def test_getall_with_item_in_map_twice_and_not_ignore_none(self):
-        map = IgnoreNoneChainMap({'test': None}, {'test': 'test'})
-        self.assertEqual(map.get_all('test'), [None, 'test'])
+    # def test_getall_with_item_in_map_twice_and_not_ignore_none(self):
+    #     map = MissingChainMap({'test': None}, {'test': 'test'})
+    #     self.assertEqual(map.get_all('test'), [None, 'test'])
 
-    def test_getitem_with_item_in_map_ignore_none(self):
-        map = IgnoreNoneChainMap({'test': None}, {'test': 'test'})
-        self.assertEqual(map.get_all('test', ignore_none=True), ['test'])
+    # def test_getitem_with_item_in_map_ignore_none(self):
+    #     map = MissingChainMap({'test': None}, {'test': 'test'})
+    #     self.assertEqual(map.get_all('test', ignore_none=True), ['test'])
 
 
 class SetMacDialectUnitTest(TestCase):
@@ -157,75 +161,78 @@ class SetMacDialectUnitTest(TestCase):
 class CliParamsUnitTest(TestCase):
     def test_with_empty_params(self):
         params = {}
-        app, mqtt, sql = get_cli_params(params)
-        self.assertDictEqual(app, {})
-        self.assertDictEqual(mqtt, {})
-        self.assertDictEqual(sql, {})
+        cfg = get_cli_params(params)
+        self.assertDictEqual(cfg, {})
 
     def test_with_falsy_app_values(self):
-        params = {'test': '', 'test2': 0, 'test3': None}
-        app, mqtt, sql = get_cli_params(params)
-        self.assertDictEqual(app, {'test': None, 'test2': None, 'test3': None})
+        params = {'test': '1', 'test2': 0, 'test3': None}
+        cfg = get_cli_params(params)
+        self.assertDictEqual(cfg, {'test': '1'})
 
     def test_with_mqtt_params(self):
         params = {'mqtt_test': 'test'}
-        app, mqtt, sql = get_cli_params(params)
-        self.assertDictEqual(mqtt, {'test': 'test'})
+        cfg = get_cli_params(params)
+        self.assertDictEqual(cfg, params)
 
     def test_with_sql_params(self):
         params = {'sql_test': 'test'}
-        app, mqtt, sql = get_cli_params(params)
-        self.assertDictEqual(sql, {'test': 'test'})
+        cfg = get_cli_params(params)
+        self.assertDictEqual(cfg, params)
 
 
 class ConfigFileUnitTest(TestCase):
     @mock.patch('probemon.config.config_file.configparser.ConfigParser.read', return_value=[])
     def test_configfile_with_empty_config(self, read):
-        app, mqtt, sql = get_configfile_params()
-        self.assertDictEqual(app, {})
-        self.assertDictEqual(mqtt, {})
-        self.assertDictEqual(sql, {})
+        cfg = get_configfile_params()
+        self.assertDictEqual(cfg, {})
 
     @mock.patch('builtins.open', mock.mock_open(read_data=APP_CONFIG))
     def test_configfile_app_empty_config(self):
-        app, mqtt, sql = get_configfile_params()
-        self.assertTrue('key' in app)
-        self.assertEqual(app['key'], 'value')
+        cfg = get_configfile_params()
+        cfg.pop('parsed_files')
+        self.assertTrue('key' in cfg)
+        self.assertEqual(cfg['key'], 'value')
 
     @mock.patch('builtins.open', mock.mock_open(read_data=MQTT_CONFIG))
     def test_configfile_with_mqtt_config(self):
-        app, mqtt, sql = get_configfile_params()
-        self.assertDictEqual(mqtt, {'key': 'value'})
+        cfg = get_configfile_params()
+        cfg.pop('parsed_files')
+        self.assertDictEqual(cfg, {'mqtt_key': 'value'})
 
     @mock.patch('builtins.open', mock.mock_open(read_data=SQL_CONFIG))
     def test_configfile_with_sql_config(self):
-        app, mqtt, sql = get_configfile_params()
-        self.assertDictEqual(sql, {'key': 'value'})
+        cfg = get_configfile_params()
+        cfg.pop('parsed_files')
+        self.assertDictEqual(cfg, {'sql_key': 'value'})
+
+    @mock.patch('builtins.open', mock.mock_open(read_data=URL_CONFIG))
+    def test_configfile_with_url_config(self):
+        cfg = get_configfile_params()
+        cfg.pop('parsed_files')
+        self.assertDictEqual(cfg, {'url_publish_key': 'value'})
 
 
 @mock.patch('probemon.config.dot_env.load_dotenv')
 class DotEnvUnitTest(TestCase):
     @mock.patch.dict('probemon.config.dot_env.os.environ', {}, clear=True)
     def test_no_params(self, _):
-        app, mqtt, sql = get_dotenv_params()
-        self.assertDictEqual(app, {})
-        self.assertDictEqual(mqtt, {})
-        self.assertDictEqual(sql, {})
+        cfg = get_dotenv_params()
+        self.assertDictEqual(cfg, {})
 
     @mock.patch.dict('probemon.config.dot_env.os.environ', {'PROBEMON_TEST': 'value'}, clear=True)
     def test_app_param(self, _):
-        app, mqtt, sql = get_dotenv_params()
-        self.assertDictEqual(app, {'test': 'value'})
+        cfg = get_dotenv_params()
+        self.assertDictEqual(cfg, {'test': 'value'})
 
     @mock.patch.dict('probemon.config.dot_env.os.environ', {'PROBEMON_SQL_TEST': 'value'}, clear=True)
     def test_sql_param(self, _):
-        app, mqtt, sql = get_dotenv_params()
-        self.assertDictEqual(sql, {'test': 'value'})
+        cfg = get_dotenv_params()
+        self.assertDictEqual(cfg, {'sql_test': 'value'})
 
     @mock.patch.dict('probemon.config.dot_env.os.environ', {'PROBEMON_MQTT_TEST': 'value'}, clear=True)
     def test_mqtt_param(self, _):
-        app, mqtt, sql = get_dotenv_params()
-        self.assertDictEqual(mqtt, {'test': 'value'})
+        cfg = get_dotenv_params()
+        self.assertDictEqual(cfg, {'mqtt_test': 'value'})
 
 
 class MqttFromParamsUnitTest(TestCase):
@@ -235,46 +242,46 @@ class MqttFromParamsUnitTest(TestCase):
         return super().tearDown()
 
     def test_empty_map(self):
-        map = IgnoreNoneChainMap()
+        map = MissingChainMap()
         config.set_mqtt_from_params(map)
         self.assertFalse(Mqtt.is_enabled())
 
     def test_with_host_port_but_without_topic(self):
         logging.disable(logging.WARNING)
-        map = IgnoreNoneChainMap({'host': 'localhost', 'port': 123})
+        map = MissingChainMap({'mqtt_host': 'localhost', 'mqtt_port': 123})
         config.set_mqtt_from_params(map)
         self.assertFalse(Mqtt.is_enabled())
         self.assertEqual(Mqtt._host, 'localhost')
         self.assertEqual(Mqtt._port, 123)
 
     def test_with_host_port_topic(self):
-        map = IgnoreNoneChainMap({'host': 'localhost', 'port': 123, 'topic': 'test'})
+        map = MissingChainMap({'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'})
         config.set_mqtt_from_params(map)
         self.assertTrue(Mqtt.is_enabled())
         self.assertEqual(Mqtt._topic, 'test')
 
     def test_with_user_password(self):
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'user': 'user', 'password': 'password'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_user': 'user', 'mqtt_password': 'password'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._user, 'user')
         self.assertEqual(Mqtt._password, 'password')
 
     def test_with_debug(self):
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'debug': 'true'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_debug': 'true'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._debug, True)
 
     @mock.patch('os.path.exists', return_value=True)
     def test_with_tls_all_exist(self, ex):
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._ca_certs, 'ca_certs')
@@ -284,9 +291,9 @@ class MqttFromParamsUnitTest(TestCase):
     @mock.patch('os.path.exists', side_effect=mock_exists_getter(['ca_certs']))
     def test_with_tls_ca_certs_does_not_exist(self, ex):
         logging.disable(logging.ERROR)
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertIsNone(Mqtt._ca_certs)
@@ -296,9 +303,9 @@ class MqttFromParamsUnitTest(TestCase):
     @mock.patch('os.path.exists', side_effect=mock_exists_getter(['ca_certs', 'certfile']))
     def test_with_tls_ca_certs_and_certfile_does_not_exist(self, ex):
         logging.disable(logging.ERROR)
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertIsNone(Mqtt._ca_certs)
@@ -308,9 +315,9 @@ class MqttFromParamsUnitTest(TestCase):
     @mock.patch('os.path.exists', side_effect=mock_exists_getter(['certfile']))
     def test_with_tls_certfile_does_not_exist(self, ex):
         logging.disable(logging.ERROR)
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._ca_certs, 'ca_certs')
@@ -320,9 +327,9 @@ class MqttFromParamsUnitTest(TestCase):
     @mock.patch('os.path.exists', side_effect=mock_exists_getter(['keyfile']))
     def test_with_tls_keyfile_does_not_exist(self, ex):
         logging.disable(logging.ERROR)
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._ca_certs, 'ca_certs')
@@ -332,9 +339,9 @@ class MqttFromParamsUnitTest(TestCase):
     @mock.patch('os.path.exists', side_effect=mock_exists_getter(['certfile', 'keyfile']))
     def test_with_tls_certfile_and_keyfile_does_not_exist(self, ex):
         logging.disable(logging.ERROR)
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'ca_certs': 'ca_certs', 'certfile': 'certfile', 'keyfile': 'keyfile'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_ca_certs': 'ca_certs', 'mqtt_certfile': 'certfile', 'mqtt_keyfile': 'keyfile'}
         )
         config.set_mqtt_from_params(map)
         self.assertEqual(Mqtt._ca_certs, 'ca_certs')
@@ -342,16 +349,16 @@ class MqttFromParamsUnitTest(TestCase):
         self.assertIsNone(Mqtt._keyfile)
 
     def test_logging_info_when_enabled(self):
-        map = IgnoreNoneChainMap(
-            {'host': 'localhost', 'port': 123, 'topic': 'test'},
-            {'user': 'user', 'password': 'password'}
+        map = MissingChainMap(
+            {'mqtt_host': 'localhost', 'mqtt_port': 123, 'mqtt_topic': 'test'},
+            {'mqtt_user': 'user', 'mqtt_password': 'password'}
         )
         with self.assertLogs(config.logger, 'INFO') as logger:
             config.set_mqtt_from_params(map)
-        self.assertIn(f'INFO:{config.logger.name}:    user      : user', logger.output)
-        self.assertIn(f'INFO:{config.logger.name}:    host      : localhost', logger.output)
-        self.assertIn(f'INFO:{config.logger.name}:    port      : 123', logger.output)
-        self.assertIn(f'INFO:{config.logger.name}:    topic     : test', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    mqtt_user : user', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    mqtt_host : localhost', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    mqtt_port : 123', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    mqtt_topic: test', logger.output)
         for output in logger.output:
             self.assertNotIn('password', output)
 
@@ -362,7 +369,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         return super().tearDown()
 
     def test_no_dialect(self):
-        map = IgnoreNoneChainMap({'host': 'localhost'})
+        map = MissingChainMap({'sql_host': 'localhost'})
         with self.assertLogs(config.logger, 'WARNING') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn(
@@ -372,7 +379,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         self.assertIsNone(sql._engine)
 
     def test_no_host(self):
-        map = IgnoreNoneChainMap({'dialect': 'localhost'})
+        map = MissingChainMap({'sql_dialect': 'localhost'})
         with self.assertLogs(config.logger, 'DEBUG') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn(
@@ -382,7 +389,7 @@ class SetSqlFromParamsUnitTest(TestCase):
         self.assertIsNone(sql._engine)
 
     def test_no_host_and_other_optns(self):
-        map = IgnoreNoneChainMap({'dialect': 'localhost', 'user': 'test'})
+        map = MissingChainMap({'sql_dialect': 'localhost', 'sql_user': 'test'})
         with self.assertLogs(config.logger, 'WARNING') as logger:
             sql = config.set_sql_from_params(map)
         self.assertIn((
@@ -394,59 +401,34 @@ class SetSqlFromParamsUnitTest(TestCase):
 
     def test_sqlite_in_memory(self):
         logging.disable(logging.WARNING)
-        map = IgnoreNoneChainMap({'dialect': 'sqlite', })
+        map = MissingChainMap({'sql_dialect': 'sqlite', })
         sql = config.set_sql_from_params(map)
         self.assertIsNotNone(sql._engine)
 
 
-class GetConfigOptionsUnitTest(TestCase):
-    @mock.patch('probemon.config.config.get_cli_params', return_value=({}, {}, {}))
-    @mock.patch('probemon.config.config.get_dotenv_params', return_value=({}, {}, {}))
-    @mock.patch('probemon.config.config.get_configfile_params', return_value=({}, {}, {}))
-    def test_with_no_params(self, *args):
-        app, mqtt, sql = config.get_config_options('')
-        self.assertEqual(list(app), [])
-        self.assertEqual(list(mqtt), [])
-        self.assertEqual(list(sql), [])
-
-    @mock.patch('probemon.config.config.get_cli_params', return_value=({}, {}, {}))
-    @mock.patch('probemon.config.config.get_dotenv_params', return_value=({}, {}, {}))
-    @mock.patch('probemon.config.config_file.configparser.ConfigParser.read', return_value=[''])
-    def test_with_config(self, ini, dotenv, cli):
-        app, _, _ = config.get_config_options('')
-        self.assertEqual(app, IgnoreNoneChainMap({}, {}, {'parsed_files': ['']}))
-
-
-@mock.patch('probemon.config.config.get_config_options')
+@mock.patch('probemon.config.config.get_cli_params')
+@mock.patch('probemon.config.config.get_dotenv_params')
+@mock.patch('probemon.config.config.get_configfile_params')
 class GetConfigUnitTest(TestCase):
-    def test_sql_enabled(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap({'dialect': 'sqlite', 'password': 'password'})
-        )
+    def test_sql_enabled(self, cli_params, dotenv, configfile):
+        dotenv.return_value = configfile.return_value = {}
+        cli_params.return_value = {'sql_dialect': 'sqlite', 'sql_password': 'password'}
         with self.assertLogs(config.logger, 'INFO') as logger, self.assertLogs(misc.logger, 'WARNING'):
             config.get_config('')
-        self.assertIn(f'INFO:{config.logger.name}:    dialect   : sqlite', logger.output)
+        self.assertIn(f'INFO:{config.logger.name}:    sql_dialect: sqlite', logger.output)
         for output in logger.output:
             self.assertNotIn('password', output)
 
-    def test_parsed_files(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap({'parsed_files': ['test']}),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap()
-        )
+    def test_parsed_files(self, cli_params, dotenv, configfile):
+        dotenv.return_value = configfile.return_value = {}
+        cli_params.return_value = {'parsed_files': ['test']}
         with self.assertLogs(config.logger, 'DEBUG') as logger:
             config.get_config('')
         self.assertIn('DEBUG:probemon.config.config:Parsed config files: test', logger.output)
 
-    def test_maclookup_api_key(self, cfgs):
-        cfgs.return_value = (
-            IgnoreNoneChainMap({'maclookup_api_key': 'test'}),
-            IgnoreNoneChainMap(),
-            IgnoreNoneChainMap()
-        )
+    def test_maclookup_api_key(self, cli_params, dotenv, configfile):
+        dotenv.return_value = configfile.return_value = {}
+        cli_params.return_value = {'maclookup_api_key': 'test'}
         config.get_config('')
         self.assertEqual(ProbeRequest.maclookup_api_key, 'test')
 
@@ -457,17 +439,17 @@ class SetProbeRequestFromParamsUnitTest(TestCase):
         return super().setUp()
 
     def test_raw(self):
-        config.set_probe_request_from_params(IgnoreNoneChainMap({'raw': True}))
+        config.set_probe_request_from_params(MissingChainMap({'raw': True}))
         self.assertTrue(ProbeRequest.raw)
 
     def test_lower(self):
-        config.set_probe_request_from_params(IgnoreNoneChainMap({'lower': True}))
+        config.set_probe_request_from_params(MissingChainMap({'lower': True}))
         self.assertTrue(ProbeRequest.lower)
 
     def test_get_vendor(self):
-        config.set_probe_request_from_params(IgnoreNoneChainMap({'vendor': True}))
+        config.set_probe_request_from_params(MissingChainMap({'vendor': True}))
         self.assertTrue(ProbeRequest.get_vendor)
 
     def test_vendor_offline(self):
-        config.set_probe_request_from_params(IgnoreNoneChainMap({'vendor_offline': True}))
+        config.set_probe_request_from_params(MissingChainMap({'vendor_offline': True}))
         self.assertTrue(ProbeRequest.vendor_offline)
