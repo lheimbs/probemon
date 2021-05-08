@@ -9,31 +9,10 @@ from ..mac import Mac
 logger = logging.getLogger(__name__)
 
 
-class IgnoreNoneChainMap(ChainMap):
-    """A ChainMap that ignores None entries in the map.
-
-    It allows defining defaults in cli options.
-    Warning: does not work with defaultdict because of <key in mapping> usage!
-    """
+class MissingChainMap(ChainMap):
+    """A ChainMap that returns None if a key is not in any of the mappings."""
     def __missing__(self, key):
         return None
-
-    def __getitem__(self, key):
-        for mapping in self.maps:
-            if key in mapping.keys() and mapping[key] is not None:
-                return mapping[key]
-        return self.__missing__(key)
-
-    def get_all(self, key: str, ignore_none: bool = False) -> list:
-        """Get all entries from all dicts that match key"""
-        values = []
-        for mapping in self.maps:
-            if key in mapping.keys():
-                if (ignore_none and mapping[key] is not None) \
-                        or not ignore_none:
-                    values.append(mapping[key])
-        return values
-
 
 def convert_option_type(value):
     if value and isinstance(value, str) and value.lower() == 'false':
@@ -50,20 +29,20 @@ def convert_option_type(value):
 
 
 def get_url(
-    dialect: str,
-    host: str = "",
-    port: int = 0,
-    user: str = "",
-    password: str = "",
-    database: str = "",
-    driver: str = "",
-    sqlite_path: str = "",
+    sql_dialect: str,
+    sql_host: str = "",
+    sql_port: int = 0,
+    sql_user: str = "",
+    sql_password: str = "",
+    sql_database: str = "",
+    sql_driver: str = "",
+    sql_sqlite_path: str = "",
     **kwargs,
 ) -> str:
     url = "{dialect}://{user}@{host}/{dbname}"
-    if dialect == "sqlite":
-        if sqlite_path:
-            url = "sqlite:///{}".format(sqlite_path)
+    if sql_dialect == "sqlite":
+        if sql_sqlite_path:
+            url = "sqlite:///{}".format(sql_sqlite_path)
         else:
             logger.warning(
                 "Using sqlite database in memory! "
@@ -71,22 +50,22 @@ def get_url(
             )
             url = "sqlite://"
     else:
-        if port:
-            host = f"{url_quote_plus(host)}:{port}"
-        if driver:
-            dialect = f"{dialect}+{driver}"
-        if password:
-            user = (
-                f"{url_quote_plus(str(user))}:{url_quote_plus(str(password))}"
+        if sql_port:
+            sql_host = f"{url_quote_plus(sql_host)}:{sql_port}"
+        if sql_driver:
+            sql_dialect = f"{sql_dialect}+{sql_driver}"
+        if sql_password:
+            sql_user = (
+                f"{url_quote_plus(str(sql_user))}:{url_quote_plus(str(sql_password))}"
             )
         url = url.format(
-            dialect=dialect, user=user, host=host, dbname=database,
+            dialect=sql_dialect, user=sql_user, host=sql_host, dbname=sql_database,
         )
-    if 'kwargs' in kwargs.keys() and kwargs['kwargs']:
+    if 'sql_kwargs' in kwargs.keys() and kwargs['sql_kwargs']:
         logger.debug(
-            f"Appending kwargs '{kwargs['kwargs']}' to database url."
+            f"Appending kwargs '{kwargs['sql_kwargs']}' to database url."
         )
-        url = url + "?" + kwargs['kwargs']
+        url = url + "?" + kwargs['sql_kwargs']
     logger.debug(f"Sql url: '{url}'.")
     return url
 

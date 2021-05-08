@@ -11,33 +11,36 @@ def cli_options(main: Callable) -> Callable:
         help="Provide a config file.",
     )(main)
     click.option(
-        '--lower', '-l', is_flag=True,
+        '--lower', '-l',
+        is_flag=True,
         help="Convert mac and venodor strings to lowercase.",
     )(main)
     click.option(
-        '--raw', '-r', is_flag=True,
+        '--raw', '-r',
+        is_flag=True,
         help="Include hex formatted raw probe request packet.",
     )(main)
     click.option(
-        '--vendor', '-v', is_flag=True,
+        '--vendor', '-v',
+        is_flag=True,
         help="Try to get vendor correlating to caputred mac address.",
     )(main)
     click.option(
-        '--vendor-offline', is_flag=True,
+        '--vendor-offline',
+        is_flag=True,
         help="Don't use maclookup APIs (netaddr only).",
     )(main)
     click.option(
         '--worker-threads',
         '-t',
         type=click.IntRange(1, None),
-        default=1,
+        # default=1,
         help="Number of workers that parse the recorded probe requests.",
     )(main)
     click.option(
         '--count',
         '-n',
         type=click.IntRange(0, None),
-        default=0,
         help=(
             "Number probe requests to capture before exiting. "
             "0 for infinite probes. Default 0."
@@ -72,11 +75,13 @@ def cli_options(main: Callable) -> Callable:
         ),
     )(main)
     click.option(
-        '--debug/--no-debug', default=False,
+        '--debug/--no-debug',
+        default=False,
         help='Enable debugging output.',
     )(main)
     click.option(
-        '--verbose/--no-verbose', default=False,
+        '--verbose/--no-verbose',
+        default=False,
         help=(
             "Enable verbose output: "
             "More status logs are given but no debugging."
@@ -137,7 +142,9 @@ def cli_mqtt_options(main: Callable) -> Callable:
         '--mqtt-host', help='Broker host name',
     )(main)
     mqtt_group.option(
-        '--mqtt-port', type=int, default=1883, help='Broker port',
+        '--mqtt-port', type=int,
+        # default=1883,
+        help='Broker port',
     )(main)
     mqtt_group.option(
         '--mqtt-topic', help="Topic to publish probes under.",
@@ -228,6 +235,25 @@ def cli_sql_options(main: Callable) -> Callable:
             "Drop probe request table on startup. "
             "Only valid in combination with DEBUG flag!"
         ),
+    )(main)
+    return main
+
+
+def cli_server_publish_options(main: Callable) -> Callable:
+    server_publish = OptionGroup(
+        'Publish to webserver configuration',
+        help="Configuration for publishing recieved Probes to a Webserver."
+    )
+    main = server_publish.option(
+        '--url-publish-url',
+        help="Url to post the revieved probes to."
+    )(main)
+    main = server_publish.option(
+        '--url-publish-token',
+        help="Token to authenticate probemon with against the server."
+    )(main)
+    main = server_publish.option(
+        '--url-publish-only-mac-and-time', is_flag=True,
     )(main)
     return main
 

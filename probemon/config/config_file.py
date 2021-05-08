@@ -1,12 +1,9 @@
 import os
 import configparser
-from typing import Tuple
 
 from .misc import convert_option_type
 
-def get_configfile_params(
-    config_path: str = ""
-) -> Tuple[dict, dict, dict, list]:
+def get_configfile_params(config_path: str = "") -> dict:
     basedir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
     )
@@ -24,12 +21,16 @@ def get_configfile_params(
         app.update({'parsed_files': parsed_files})
     mqtt = dict(config.items('MQTT')) if 'MQTT' in config else {}
     sql = dict(config.items('SQL')) if 'SQL' in config else {}
+    url = dict(config.items('URLPUBLISH')) if 'URLPUBLISH' in config else {}
 
+    cfg = {}
     for key, value in app.items():
-        app[key] = convert_option_type(value)
+        cfg[key.lower()] = convert_option_type(value)
     for key, value in mqtt.items():
-        mqtt[key] = convert_option_type(value)
+        cfg['mqtt_' + key.lower()] = convert_option_type(value)
     for key, value in sql.items():
-        sql[key] = convert_option_type(value)
+        cfg['sql_' + key.lower()] = convert_option_type(value)
+    for key, value in url.items():
+        cfg['url_publish_' + key.lower()] = convert_option_type(value)
 
-    return app, mqtt, sql
+    return cfg

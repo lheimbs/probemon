@@ -1,16 +1,7 @@
 
-def get_cli_params(params: dict):
-    mqtt = {}
-    sql = {}
-    app = {}
+def get_cli_params(params: dict) -> dict:
+    cfg = {}
     for key, value in params.items():
-        if not value:
-            value = None
-
-        if key.startswith('mqtt_'):
-            mqtt[key.replace('mqtt_', '')] = value
-        elif key.startswith('sql_'):
-            sql[key.replace('sql_', '')] = value
-        else:
-            app[key] = value
-    return app, mqtt, sql
+        if value:
+            cfg[key] = value
+    return cfg
