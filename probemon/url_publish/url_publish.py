@@ -20,7 +20,7 @@ class UrlDaemon(Thread):
         self.url = kwargs.pop('url') if 'url' in kwargs else ''
         self.token = kwargs.pop('token') if 'token' in kwargs else ''
         self.session = requests.Session()
-        self.session.headers.update({'Authorization': f'Bearer {self.token}'})
+        self.session.headers.update({'Authorization': f'token {self.token}'})
         kwargs['daemon'] = True
         super().__init__(**kwargs)
 
@@ -34,11 +34,11 @@ class UrlDaemon(Thread):
         probe = UrlDaemon.queue.get()
         response = self.session.post(self.url, data=dict(probe))
         UrlDaemon.queue.task_done()
-        if response.status_code == 200:
+        if response.status_code == 201:
             logger.debug(f"Published probe {probe!r} to {self.url}.")
         else:
             logger.error(
                 f"Failed to publish {probe!r} to {self.url} with "
                 f"status code {response.status_code}: {response.reason}."
             )
-            UrlDaemon.queue.put(probe)
+            # UrlDaemon.queue.put(probe)
