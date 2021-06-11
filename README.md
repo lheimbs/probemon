@@ -1,3 +1,5 @@
+[![CodeFactor](https://www.codefactor.io/repository/github/lheimbs/probemon/badge/main)](https://www.codefactor.io/repository/github/lheimbs/probemon/overview/main)
+
 # probemon
 A (not that simple) command line tool for monitoring and logging 802.11 probe frames.
 
