@@ -42,6 +42,11 @@ Available are (with mac `a0:b1:c2:d3:e4:f5` as an example):
 - unix: `ab:1:c2:d3:e4:f5`
 - unix_expanded: `ab:01:c2:d3:e4:f5`
 
+### Transmit live incoming probes to to a Server
+To process live probes, it is possible to transmit a probe as it is recorded to a (remote) server.
+It is highly recommended to use HTTPS over HTTP for a secure transmission but `probemon` holds no opinion on this itself.
+
+
 ## Configuration
 Probemon has three different configuration options:
 1. [Commandline Arguments/Options](#CLI)
@@ -58,6 +63,13 @@ For details or configration help see [here](https://docs.sqlalchemy.org/en/14/co
 
 ### MQTT
 The MQTT-Client uses [paho-mqtt](https://pypi.org/project/paho-mqtt/).
+
+### Publishing to server
+`probemon` uses pythons `requests` library to transmit probes.
+A valid url needs to be given in order to publish probes.
+Furthermote, it is possible to supply a token to authenticate `probemon` to the server.
+To keep traffic minimal, it is possible to limit the published data to the MAC-address and the recorded time only.
+
 
 ## Usage
 ### CLI
@@ -159,6 +171,10 @@ Options:
                                   to a Webserver.
 
     --url-publish-only-mac-and-time
+    --url-publish-token-prefix TEXT
+                                  Prefix of token in Authentication HTTP
+                                  header. Defaults to 'Token <token>'.
+
     --url-publish-token TEXT      Token to authenticate probemon with against
                                   the server.
 

@@ -88,7 +88,11 @@ def collect_probes(interface: str, cfg: MissingChainMap):
     logger.info("Start publisher daemons...")
     MqttDaemon(daemon=True).start()
     SqlDaemon(daemon=True).start()
-    UrlDaemon(url=cfg['url_publish_url'], token=cfg['url_publish_token']).start()
+    UrlDaemon(
+        url=cfg['url_publish_url'],
+        token=cfg['url_publish_token'],
+        token_prefix=cfg['url_publish_token_prefix']
+    ).start()
 
     logger.info("Start collecting probe requests...")
     s = time.perf_counter()

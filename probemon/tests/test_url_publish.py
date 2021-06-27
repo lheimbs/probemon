@@ -26,10 +26,10 @@ class UrlDaemonUnitTest(TestCase):
         url.run()
         self.assertFalse(url_publish.UrlDaemon.running)
 
-    def test_run_with_url_without_token(self):
-        url = url_publish.UrlDaemon(url='test')
-        url.run()
-        self.assertFalse(url_publish.UrlDaemon.running)
+    # def test_run_with_url_without_token(self):
+    #     url = url_publish.UrlDaemon(url='test')
+    #     url.run()
+    #     self.assertFalse(url_publish.UrlDaemon.running)
 
     @mock.patch.object(url_publish.UrlDaemon, 'handle_probe', side_effect=[True, InterruptedError])
     def test_run_with_url_with_token_and_good_response(self, _):
