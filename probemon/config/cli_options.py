@@ -253,6 +253,10 @@ def cli_server_publish_options(main: Callable) -> Callable:
         help="Token to authenticate probemon with against the server."
     )(main)
     main = server_publish.option(
+        '--url-publish-token-prefix',
+        help="Prefix of token in Authentication HTTP header. Defaults to 'Token <token>'."
+    )(main)
+    main = server_publish.option(
         '--url-publish-only-mac-and-time', is_flag=True,
     )(main)
     return main
