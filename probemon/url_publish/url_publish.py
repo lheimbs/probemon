@@ -19,14 +19,16 @@ class UrlDaemon(Thread):
     def __init__(self, **kwargs):
         self.url = kwargs.pop('url') if 'url' in kwargs else ''
         self.token = kwargs.pop('token') if 'token' in kwargs else ''
+        self.token_prefix = kwargs.pop('token_prefix') if 'token_prefix' in kwargs else 'Token'
         self.session = requests.Session()
-        self.session.headers.update({'Authorization': f'token {self.token}'})
+        if self.token:
+            self.session.headers.update({'Authorization': f'{self.token_prefix} {self.token}'})
         kwargs['daemon'] = True
         super().__init__(**kwargs)
 
     def run(self):
         UrlDaemon.running = True
-        while self.url and self.token:
+        while self.url:
             self.handle_probe()
         UrlDaemon.running = False
 
